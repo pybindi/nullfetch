@@ -43,7 +43,8 @@ echo "$PATH" | grep -q "$HOME/.local/bin" && echo OK
 
 ### Arch Linux
 
-A `PKGBUILD` is included, so you can build and install it with `pacman`:
+A `PKGBUILD` for the `nullfetch` package is included, so you can build and
+install it with `pacman`:
 
 ```bash
 git clone https://github.com/pybindi/nullfetch.git
@@ -53,6 +54,12 @@ makepkg -si
 
 `pacman` will pull the dependency (`python`) automatically. `pciutils` is
 optional and only needed for GPU detection.
+
+Once published to the AUR, it can be installed with an AUR helper:
+
+```bash
+yay -S nullfetch
+```
 
 ## 🚀 Usage
 
