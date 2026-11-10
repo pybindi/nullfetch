@@ -41,6 +41,19 @@ Make sure `~/.local/bin` is in your `PATH`:
 echo "$PATH" | grep -q "$HOME/.local/bin" && echo OK
 ```
 
+### Arch Linux
+
+A `PKGBUILD` is included, so you can build and install it with `pacman`:
+
+```bash
+git clone https://github.com/pybindi/nullfetch.git
+cd nullfetch
+makepkg -si
+```
+
+`pacman` will pull the dependency (`python`) automatically. `pciutils` is
+optional and only needed for GPU detection.
+
 ## 🚀 Usage
 
 Run from the project directory:

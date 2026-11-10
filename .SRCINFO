@@ -1,0 +1,14 @@
+pkgbase = nullfetch-git
+	pkgdesc = A tiny system fetch for Linux — pure Python, zero dependencies
+	pkgver = r6.433f82f
+	pkgrel = 1
+	url = https://github.com/pybindi/nullfetch
+	arch = any
+	license = MIT
+	makedepends = git
+	depends = python
+	optdepends = pciutils: GPU detection with lspci
+	source = git+https://github.com/pybindi/nullfetch.git
+	sha256sums = SKIP
+
+pkgname = nullfetch-git
