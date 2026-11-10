@@ -1,0 +1,16 @@
+Source: nullfetch
+Section: utils
+Priority: optional
+Maintainer: pybindi <sungunboom@gmail.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Homepage: https://github.com/pybindi/nullfetch
+Rules-Requires-Root: no
+
+Package: nullfetch
+Architecture: all
+Depends: ${misc:Depends}, python3
+Recommends: pciutils
+Description: tiny system fetch for Linux written in Python
+ nullfetch prints system information next to an ASCII logo using only
+ the Python standard library.

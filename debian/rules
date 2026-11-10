@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# nothing to build — pure Python
+
+override_dh_auto_install:
+	install -Dm755 nullfetch.py debian/nullfetch/usr/bin/nullfetch
+	install -Dm644 logos.py debian/nullfetch/usr/share/doc/nullfetch/logos.py
+	install -Dm644 README.md debian/nullfetch/usr/share/doc/nullfetch/README.md
+
+override_dh_auto_test:
+	# nothing to test

@@ -61,6 +61,18 @@ Once published to the AUR, it can be installed with an AUR helper:
 yay -S nullfetch
 ```
 
+### Debian / Ubuntu
+
+Debian packaging lives in `debian/`. On a Debian-based system:
+
+```bash
+sudo apt install debhelper devscripts
+dpkg-buildpackage -us -uc -b
+sudo apt install ../nullfetch_1.0.0_all.deb
+```
+
+A prebuilt package is also available in the releases page.
+
 ## 🚀 Usage
 
 Run from the project directory:
