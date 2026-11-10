@@ -2,7 +2,7 @@
 
 # nullfetch
 
-**Минималистичный fetch для терминала — на чистом Python, без зависимостей.**
+**A tiny system fetch for Linux — pure Python, zero dependencies.**
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)](#)
@@ -10,20 +10,22 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Check](https://github.com/pybindi/nullfetch/actions/workflows/check.yml/badge.svg)](https://github.com/pybindi/nullfetch/actions/workflows/check.yml)
 
-<img src="assets/demo.svg" alt="nullfetch в терминале" width="720">
+<img src="assets/demo.svg" alt="nullfetch in a terminal" width="720">
 
 </div>
 
-## ✨ Возможности
+## ✨ Features
 
-- 👤 имя пользователя и имя компьютера;
-- 🐧 дистрибутив Linux и версия ядра;
-- 💻 архитектура процессора;
-- 🎨 ASCII-логотип и жирные подписи;
-- 📦 только стандартная библиотека Python — ничего устанавливать не нужно;
-- 🚀 запускается как обычная команда.
+- 👤 current user and hostname
+- 🐧 Linux distribution and kernel version
+- 🖥️ CPU model and GPU
+- 🧠 RAM usage
+- ⌨️ terminal type
+- 🎨 ASCII logo with bold labels
+- ❓ built-in `--help`
+- 📦 standard library only — nothing to install
 
-## 📦 Установка
+## 📦 Installation
 
 ```bash
 git clone https://github.com/pybindi/nullfetch.git
@@ -33,29 +35,36 @@ chmod +x nullfetch.py
 ln -s "$PWD/nullfetch.py" ~/.local/bin/nullfetch
 ```
 
-Убедись, что `~/.local/bin` есть в `PATH`:
+Make sure `~/.local/bin` is in your `PATH`:
 
 ```bash
 echo "$PATH" | grep -q "$HOME/.local/bin" && echo OK
 ```
 
-## 🚀 Использование
+## 🚀 Usage
 
-Из папки проекта:
+Run from the project directory:
 
 ```bash
 python nullfetch.py
 ```
 
-Или как команду, из любого места:
+Or as a command from anywhere:
 
 ```bash
 nullfetch
 ```
 
-Пример вывода:
+### Options
+
+| Option | Description |
+| :--- | :--- |
+| `-h`, `--help` | Show help and exit |
+
+## 🖼 Example output
 
 ```text
+--------------------------
         .--.
        |o_o |
        |:_/ |
@@ -63,17 +72,22 @@ nullfetch
      (|     | )
     /'\_   _/`\
     \___)=(___/
+
 USER: matuha
 HOST: void
 OS: Void Linux
 kernel: 6.18.60_1
-architecture: x86_64
+terminal: xterm-256color
+CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
+GPU: Intel Corporation Haswell-ULT Integrated Graphics Controller
+RAM: 3 / 7 GB
+--------------------------
 ```
 
-## 🖼 Свои рисунки
+## 🎨 Custom logo
 
-В файле [`logos.py`](logos.py) собрана коллекция ASCII-рисунков. Можно взять
-любой и вставить в `printlogo()`:
+[`logos.py`](logos.py) contains a collection of ASCII art. Pick one and paste
+it into `printlogo()`:
 
 ```python
 def printlogo():
@@ -86,27 +100,27 @@ def printlogo():
     \___)=(___/""")
 ```
 
-> `r"""..."""` — «сырая» многострочная строка: обратные слэши в рисунке
-> не нужно удваивать.
+> `r"""..."""` is a raw multi-line string, so backslashes in the art
+> do not need to be escaped.
 
-## 🗂 Структура проекта
+## 🗂 Project structure
 
 ```text
 nullfetch/
-├── nullfetch.py        # сам fetch
-├── logos.py            # коллекция ASCII-рисунков
+├── nullfetch.py        # the fetch itself
+├── logos.py            # ASCII art collection
 ├── assets/
-│   └── demo.svg        # картинка для README
-├── .github/workflows/  # проверка синтаксиса при push
+│   └── demo.svg        # README preview
+├── .github/workflows/  # syntax check on push
 ├── LICENSE
 └── README.md
 ```
 
-## 🧩 Требования
+## 🧩 Requirements
 
-- Python **3.10+**;
-- Linux (используется `platform.freedesktop_os_release`).
+- Python **3.10+**
+- Linux (`platform.freedesktop_os_release`)
 
-## 📄 Лицензия
+## 📄 License
 
-[MIT](LICENSE) — используй, меняй и распространяй свободно.
+[MIT](LICENSE) — free to use, modify and share.

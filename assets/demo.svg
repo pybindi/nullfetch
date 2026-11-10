@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="720" height="391" viewBox="0 0 720 391" role="img" aria-label="nullfetch terminal demo">
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="479" viewBox="0 0 720 479" role="img" aria-label="nullfetch terminal demo">
   <style>
     .t { font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; fill: #c9d1d9; white-space: pre; }
     .title { font-family: ui-sans-serif, -apple-system, "Segoe UI", sans-serif; font-size: 13px; fill: #8b949e; }
   </style>
 
-  <rect x="0.5" y="0.5" width="719" height="390" rx="12" fill="#0d1117" stroke="#30363d"/>
+  <rect x="0.5" y="0.5" width="719" height="478" rx="12" fill="#0d1117" stroke="#30363d"/>
   <path d="M0.5 38 V12.5 A12 12 0 0 1 12.5 0.5 H707.5 A12 12 0 0 1 719.5 12.5 V38 Z" fill="#161b22"/>
   <line x1="0.5" y1="38" x2="719.5" y2="38" stroke="#30363d"/>
 
@@ -14,17 +14,21 @@
 
   <text x="360.0" y="24" text-anchor="middle" class="title">nullfetch — ~/PK</text>
 
-  <text x="26" y="79" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;.--.</tspan></text>
-  <text x="26" y="101" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;&#160;&#160;&#160;|o_o&#160;|</tspan></text>
-  <text x="26" y="123" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;&#160;&#160;&#160;|:_/&#160;|</tspan></text>
-  <text x="26" y="145" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;&#160;&#160;//&#160;&#160;&#160;\&#160;\</tspan></text>
-  <text x="26" y="167" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;&#160;(|&#160;&#160;&#160;&#160;&#160;|&#160;)</tspan></text>
-  <text x="26" y="189" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;/&#x27;\_&#160;&#160;&#160;_/`\</tspan></text>
-  <text x="26" y="211" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;\___)=(___/</tspan></text>
-  <text x="26" y="233" class="t" xml:space="preserve"><tspan font-weight="700">USER:</tspan><tspan>&#160;matuha</tspan></text>
-  <text x="26" y="255" class="t" xml:space="preserve"><tspan font-weight="700">HOST:</tspan><tspan>&#160;void</tspan></text>
-  <text x="26" y="277" class="t" xml:space="preserve"><tspan font-weight="700">OS:</tspan><tspan>&#160;Void&#160;Linux</tspan></text>
-  <text x="26" y="299" class="t" xml:space="preserve"><tspan font-weight="700">kernel:</tspan><tspan>&#160;6.18.60_1</tspan></text>
-  <text x="26" y="321" class="t" xml:space="preserve"><tspan font-weight="700">architecture:</tspan><tspan>&#160;x86_64</tspan></text>
-  <text x="26" y="365" class="t" xml:space="preserve"><tspan>--------------------------</tspan></text>
+  <text x="26" y="79" class="t" xml:space="preserve"><tspan>--------------------------</tspan></text>
+  <text x="26" y="101" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;.--.</tspan></text>
+  <text x="26" y="123" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;&#160;&#160;&#160;|o_o&#160;|</tspan></text>
+  <text x="26" y="145" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;&#160;&#160;&#160;|:_/&#160;|</tspan></text>
+  <text x="26" y="167" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;&#160;&#160;//&#160;&#160;&#160;\&#160;\</tspan></text>
+  <text x="26" y="189" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;&#160;(|&#160;&#160;&#160;&#160;&#160;|&#160;)</tspan></text>
+  <text x="26" y="211" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;/&#x27;\_&#160;&#160;&#160;_/`\</tspan></text>
+  <text x="26" y="233" class="t" xml:space="preserve"><tspan>&#160;&#160;&#160;&#160;\___)=(___/</tspan></text>
+  <text x="26" y="277" class="t" xml:space="preserve"><tspan font-weight="700">USER:</tspan><tspan>&#160;matuha</tspan></text>
+  <text x="26" y="299" class="t" xml:space="preserve"><tspan font-weight="700">HOST:</tspan><tspan>&#160;void</tspan></text>
+  <text x="26" y="321" class="t" xml:space="preserve"><tspan font-weight="700">OS:</tspan><tspan>&#160;Void&#160;Linux</tspan></text>
+  <text x="26" y="343" class="t" xml:space="preserve"><tspan font-weight="700">kernel:</tspan><tspan>&#160;6.18.60_1</tspan></text>
+  <text x="26" y="365" class="t" xml:space="preserve"><tspan font-weight="700">terminal:</tspan><tspan>&#160;xterm-256color</tspan></text>
+  <text x="26" y="387" class="t" xml:space="preserve"><tspan font-weight="700">CPU:</tspan><tspan>&#160;Intel(R)&#160;Core(TM)&#160;i7-4600U&#160;CPU&#160;@&#160;2.10GHz</tspan></text>
+  <text x="26" y="409" class="t" xml:space="preserve"><tspan font-weight="700">GPU:</tspan><tspan>&#160;Intel&#160;Corporation&#160;Haswell-ULT&#160;Integrated&#160;Graphics&#160;Controller</tspan></text>
+  <text x="26" y="431" class="t" xml:space="preserve"><tspan font-weight="700">RAM:</tspan><tspan>&#160;3&#160;/&#160;7&#160;GB</tspan></text>
+  <text x="26" y="453" class="t" xml:space="preserve"><tspan>--------------------------</tspan></text>
 </svg>
