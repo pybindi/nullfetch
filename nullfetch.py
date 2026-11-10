@@ -39,3 +39,6 @@ pcinfo()
 
 #space
 print("            ")
+
+#line
+print("--------------------------")
