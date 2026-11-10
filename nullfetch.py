@@ -1,13 +1,47 @@
 #!/usr/bin/env python3
 import platform
 import getpass
+import sys
+import os
+import subprocess
+
+if "--help" in sys.argv:
+    print("nullfetch - PC info")
+    sys.exit()
 
 #pcinfo:
 user = getpass.getuser()
 host = platform.node()
 distro = platform.freedesktop_os_release()["PRETTY_NAME"]
 kernel = platform.release()
-arct = platform.machine()
+term = os.environ.get("TERM", "?")
+
+cpu = "?"
+with open("/proc/cpuinfo") as f:
+    for line in f:
+        if line.startswith("model name"):
+            cpu = line.split(":", 1)[1].strip()
+            break
+
+with open("/proc/meminfo") as f:
+    mem = {}
+    for line in f:
+        key, value = line.split(":", 1)
+        mem[key] = value.strip()
+
+ram_total = int(mem["MemTotal"].split()[0]) // 1024 // 1024
+ram_free = int(mem["MemAvailable"].split()[0]) // 1024 // 1024
+ram = f"{ram_total - ram_free} / {ram_total} GB"
+
+gpu = "?"
+try:
+    out = subprocess.run(["lspci"], capture_output=True, text=True).stdout
+    for line in out.splitlines():
+        if "VGA compatible controller" in line or "3D controller" in line:
+            gpu = line.split(": ", 1)[1].split(" (rev")[0]
+            break
+except FileNotFoundError:
+    pass
 
 
 def printlogo():
@@ -28,17 +62,22 @@ def pcinfo():
     show("HOST",host)
     show("OS", distro)
     show("kernel", kernel)
-    show("architecture", arct)
+    show("terminal", term)
+    show("CPU", cpu)
+    show("GPU", gpu)
+    show("RAM", ram)
 
+#line1
+print("--------------------------")
 
 #pictureprint:
 printlogo()
 
+#space
+print("                   ")
+
 #pcinfoprint:
 pcinfo()
 
-#space
-print("            ")
-
-#line
+#line2
 print("--------------------------")
