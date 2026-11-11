@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Check](https://github.com/pybindi/nullfetch/actions/workflows/check.yml/badge.svg)](https://github.com/pybindi/nullfetch/actions/workflows/check.yml)
 
-<img src="assets/demo.svg" alt="nullfetch in a terminal" width="720">
+<img src="assets/demo.gif" alt="nullfetch in a terminal" width="720">
 
 </div>
 
@@ -22,7 +22,8 @@
 - 🧠 RAM usage
 - ⌨️ terminal type
 - 🎨 ASCII logo with bold labels
-- ❓ built-in `--help`
+- ❓ built-in `--help` and `--version`
+- 🙈 `--no-logo` for a text-only output
 - 📦 standard library only — nothing to install
 
 ## 📦 Installation
@@ -92,6 +93,8 @@ nullfetch
 | Option | Description |
 | :--- | :--- |
 | `-h`, `--help` | Show help and exit |
+| `--version` | Show version and exit |
+| `--no-logo` | Hide the ASCII logo |
 
 ## 🖼 Example output
 

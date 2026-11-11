@@ -5,9 +5,28 @@ import sys
 import os
 import subprocess
 
-if "--help" in sys.argv:
-    print("nullfetch - PC info")
+VERSION = "1.0.0"
+
+HELP = """nullfetch - PC info
+
+Usage:
+  nullfetch [options]
+
+Options:
+  -h, --help      show this help
+      --version   show version
+      --no-logo   hide the ASCII logo
+"""
+
+if "--help" in sys.argv or "-h" in sys.argv:
+    print(HELP)
     sys.exit()
+
+if "--version" in sys.argv:
+    print(f"nullfetch {VERSION}")
+    sys.exit()
+
+no_logo = "--no-logo" in sys.argv
 
 #pcinfo:
 user = getpass.getuser()
@@ -71,10 +90,12 @@ def pcinfo():
 print("--------------------------")
 
 #pictureprint:
-printlogo()
+if not no_logo:
+    printlogo()
 
 #space
-print("                   ")
+if not no_logo:
+    print("                   ")
 
 #pcinfoprint:
 pcinfo()
