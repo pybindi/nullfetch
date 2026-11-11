@@ -1,3 +1,10 @@
+nullfetch (1.1.0) unstable; urgency=medium
+
+  * Add --version and --no-logo options.
+  * Add banner and animated demo to README.
+
+ -- pybindi <sungunboom@gmail.com>  Wed, 11 Nov 2026 12:10:00 +0000
+
 nullfetch (1.0.0) unstable; urgency=medium
 
   * Initial release.

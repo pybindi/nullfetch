@@ -1,12 +1,13 @@
 <div align="center">
 
-# nullfetch
+<img src="assets/banner.png" alt="nullfetch" width="100%">
 
 **A tiny system fetch for Linux — pure Python, zero dependencies.**
 
+[![Release](https://img.shields.io/github/v/release/pybindi/nullfetch?color=478061&label=release)](https://github.com/pybindi/nullfetch/releases)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)](#)
-[![No dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)](#)
+[![Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)](#)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Check](https://github.com/pybindi/nullfetch/actions/workflows/check.yml/badge.svg)](https://github.com/pybindi/nullfetch/actions/workflows/check.yml)
 
@@ -22,11 +23,13 @@
 - 🧠 RAM usage
 - ⌨️ terminal type
 - 🎨 ASCII logo with bold labels
-- ❓ built-in `--help` and `--version`
+- ❓ `--help` and `--version`
 - 🙈 `--no-logo` for a text-only output
 - 📦 standard library only — nothing to install
 
-## 📦 Installation
+## 📥 Installation
+
+### Any Linux
 
 ```bash
 git clone https://github.com/pybindi/nullfetch.git
@@ -44,8 +47,7 @@ echo "$PATH" | grep -q "$HOME/.local/bin" && echo OK
 
 ### Arch Linux
 
-A `PKGBUILD` for the `nullfetch` package is included, so you can build and
-install it with `pacman`:
+A `PKGBUILD` is included, so you can build and install the package with `pacman`:
 
 ```bash
 git clone https://github.com/pybindi/nullfetch.git
@@ -53,39 +55,26 @@ cd nullfetch
 makepkg -si
 ```
 
-`pacman` will pull the dependency (`python`) automatically. `pciutils` is
-optional and only needed for GPU detection.
-
-Once published to the AUR, it can be installed with an AUR helper:
-
-```bash
-yay -S nullfetch
-```
+`pacman` pulls `python` automatically. `pciutils` is optional and only needed
+for GPU detection.
 
 ### Debian / Ubuntu
 
-Debian packaging lives in `debian/`. On a Debian-based system:
+Debian packaging lives in `debian/`:
 
 ```bash
 sudo apt install debhelper devscripts
 dpkg-buildpackage -us -uc -b
-sudo apt install ../nullfetch_1.0.0_all.deb
+sudo apt install ../nullfetch_1.1.0_all.deb
 ```
 
-A prebuilt package is also available in the releases page.
+A prebuilt `.deb` is attached to every release.
 
 ## 🚀 Usage
 
-Run from the project directory:
-
 ```bash
-python nullfetch.py
-```
-
-Or as a command from anywhere:
-
-```bash
-nullfetch
+nullfetch            # logo + system info
+nullfetch --no-logo  # text only
 ```
 
 ### Options
@@ -121,8 +110,8 @@ RAM: 3 / 7 GB
 
 ## 🎨 Custom logo
 
-[`logos.py`](logos.py) contains a collection of ASCII art. Pick one and paste
-it into `printlogo()`:
+[`logos.py`](logos.py) collects a set of ASCII art. Pick one and paste it into
+`printlogo()`:
 
 ```python
 def printlogo():
@@ -135,8 +124,8 @@ def printlogo():
     \___)=(___/""")
 ```
 
-> `r"""..."""` is a raw multi-line string, so backslashes in the art
-> do not need to be escaped.
+> `r"""..."""` is a raw multi-line string, so backslashes in the art do not
+> need to be escaped.
 
 ## 🗂 Project structure
 
@@ -145,7 +134,11 @@ nullfetch/
 ├── nullfetch.py        # the fetch itself
 ├── logos.py            # ASCII art collection
 ├── assets/
-│   └── demo.svg        # README preview
+│   ├── banner.png      # README header
+│   ├── demo.gif        # animated preview
+│   └── demo.svg        # static preview
+├── debian/             # Debian packaging
+├── PKGBUILD            # Arch Linux package
 ├── .github/workflows/  # syntax check on push
 ├── LICENSE
 └── README.md
