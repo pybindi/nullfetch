@@ -11,7 +11,7 @@ import sys
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -24,12 +24,10 @@ FIELDS = [
     "uptime",
     "shell",
     "terminal",
-    "de",
     "cpu",
     "gpu",
     "ram",
     "disk",
-    "packages",
 ]
 
 LABELS = {
@@ -40,12 +38,10 @@ LABELS = {
     "uptime": "uptime",
     "shell": "shell",
     "terminal": "terminal",
-    "de": "DE",
     "cpu": "CPU",
     "gpu": "GPU",
     "ram": "RAM",
     "disk": "disk",
-    "packages": "packages",
 }
 
 DISTRO_COLORS = {
@@ -161,14 +157,6 @@ def get_terminal():
     return os.environ.get("TERM", "?")
 
 
-def get_de():
-    return (
-        os.environ.get("XDG_CURRENT_DESKTOP")
-        or os.environ.get("DESKTOP_SESSION")
-        or "?"
-    )
-
-
 def get_cpu():
     for line in read("/proc/cpuinfo").splitlines():
         if line.startswith("model name"):
@@ -220,38 +208,6 @@ def get_disk():
     return f"{(total - free) // gb} / {total // gb} GB"
 
 
-PACKAGE_COMMANDS = {
-    "void": ["xbps-query", "-l"],
-    "debian": ["dpkg-query", "-f", ".\\n", "-W"],
-    "ubuntu": ["dpkg-query", "-f", ".\\n", "-W"],
-    "arch": ["pacman", "-Q"],
-    "manjaro": ["pacman", "-Q"],
-    "endeavouros": ["pacman", "-Q"],
-    "fedora": ["rpm", "-qa"],
-    "opensuse": ["rpm", "-qa"],
-    "alpine": ["apk", "info"],
-    "gentoo": ["qlist", "-I"],
-}
-
-
-def get_packages():
-    release = os_release()
-    names = [release.get("ID", "").lower()]
-    names += release.get("ID_LIKE", "").lower().split()
-
-    for name in names:
-        command = PACKAGE_COMMANDS.get(name)
-        if command and shutil.which(command[0]):
-            try:
-                out = subprocess.run(
-                    command, capture_output=True, text=True, timeout=5
-                ).stdout
-            except (OSError, subprocess.SubprocessError):
-                return "?"
-            return str(len([line for line in out.splitlines() if line.strip()]))
-    return "?"
-
-
 GETTERS = {
     "user": get_user,
     "host": get_host,
@@ -260,12 +216,10 @@ GETTERS = {
     "uptime": get_uptime,
     "shell": get_shell,
     "terminal": get_terminal,
-    "de": get_de,
     "cpu": get_cpu,
     "gpu": get_gpu,
     "ram": get_ram,
     "disk": get_disk,
-    "packages": get_packages,
 }
 
 

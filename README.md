@@ -19,10 +19,9 @@
 
 - 👤 user and hostname
 - 🐧 distribution, kernel, uptime
-- ⌨️ shell, desktop environment, terminal
+- ⌨️ shell and terminal
 - 🖥️ CPU and GPU
 - 🧠 RAM and disk usage
-- 📦 installed package count
 - 🎨 logo colored with your distro's color (truecolor, 256-color fallback)
 - 🧩 text next to the logo, like a real fetch
 - 🙈 `--no-logo` for a text-only output
@@ -71,7 +70,7 @@ for GPU detection.
 A prebuilt `.deb` is attached to every release:
 
 ```bash
-sudo apt install ./nullfetch_1.2.0_all.deb
+sudo apt install ./nullfetch_1.2.1_all.deb
 ```
 
 Or build it from source:
@@ -79,7 +78,7 @@ Or build it from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_1.2.0_all.deb
+sudo apt install ./dist/nullfetch_1.2.1_all.deb
 ```
 
 ## 🚀 Usage
@@ -105,7 +104,7 @@ nullfetch --json          # machine-readable output
 ### Fields
 
 ```text
-user host os kernel uptime shell terminal de cpu gpu ram disk packages
+user host os kernel uptime shell terminal cpu gpu ram disk
 ```
 
 ## 🖼 Example output
@@ -118,12 +117,10 @@ user host os kernel uptime shell terminal de cpu gpu ram disk packages
      (|     | )    uptime: 2d 3h 14m
     /'\_   _/`\    shell: bash
     \___)=(___/    terminal: xterm-256color
-                   DE: sway
                    CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
                    GPU: Intel Corporation Haswell-ULT Integrated Graphics Controller
                    RAM: 3 / 7 GB
                    disk: 31 / 237 GB
-                   packages: 779
 ```
 
 ## 🤖 JSON output
@@ -141,12 +138,10 @@ nullfetch --json
   "uptime": "2d 3h 14m",
   "shell": "bash",
   "terminal": "xterm-256color",
-  "de": "sway",
   "cpu": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz",
   "gpu": "Intel Corporation Haswell-ULT Integrated Graphics Controller",
   "ram": "3 / 7 GB",
-  "disk": "31 / 237 GB",
-  "packages": "779"
+  "disk": "31 / 237 GB"
 }
 ```
 
