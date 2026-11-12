@@ -14,11 +14,11 @@ root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 
 pkg="$root/nullfetch"
-mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" \
-    "$pkg/usr/share/doc/nullfetch" "$pkg/usr/share/man/man1"
+mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/share/doc/nullfetch" \
+    "$pkg/usr/share/nullfetch" "$pkg/usr/share/man/man1"
 
 install -Dm755 nullfetch.py "$pkg/usr/bin/nullfetch"
-install -Dm644 logos.py "$pkg/usr/share/doc/nullfetch/logos.py"
+install -Dm644 logos.py "$pkg/usr/share/nullfetch/logos.py"
 install -Dm644 README.md "$pkg/usr/share/doc/nullfetch/README.md"
 install -Dm644 debian/copyright "$pkg/usr/share/doc/nullfetch/copyright"
 gzip -9n -c nullfetch.1 >"$pkg/usr/share/man/man1/nullfetch.1.gz"

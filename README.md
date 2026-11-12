@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Check](https://github.com/pybindi/nullfetch/actions/workflows/check.yml/badge.svg)](https://github.com/pybindi/nullfetch/actions/workflows/check.yml)
 
-<img src="assets/demo.gif" alt="nullfetch in a terminal" width="900">
+<img src="assets/demo.gif" alt="nullfetch in a terminal" width="1000">
 
 </div>
 
@@ -21,26 +21,16 @@
 - 🐧 distribution and kernel
 - 🖥️ CPU and GPU
 - 🧠 RAM and disk usage with bars and percentages
-- 🎨 logo colored with your distro's color (truecolor, 256-color fallback)
+- 🎨 distro logo, colored with your distro's color (truecolor, 256-color fallback)
 - 🧩 text next to the logo, like a real fetch
+- 🖼 `--logo NAME` to pick any logo from `logos.py`
+- 📐 adapts to narrow terminals instead of wrapping
 - 🙈 `--no-logo` for a text-only output
 - 🎯 `--only` to pick fields
 - 🤖 `--json` for scripts
 - 📦 standard library only — nothing to install
 
 ## 📥 Installation
-
-### PyPI
-
-```bash
-pipx install nullfetch
-```
-
-or, without `pipx`:
-
-```bash
-pip install --user nullfetch
-```
 
 ### Any Linux
 
@@ -81,7 +71,7 @@ for GPU detection.
 A prebuilt `.deb` is attached to every release:
 
 ```bash
-sudo apt install ./nullfetch_1.3.0_all.deb
+sudo apt install ./nullfetch_1.4.0_all.deb
 ```
 
 Or build it from source:
@@ -89,7 +79,7 @@ Or build it from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_1.3.0_all.deb
+sudo apt install ./dist/nullfetch_1.4.0_all.deb
 ```
 
 ## 🚀 Usage
@@ -108,6 +98,7 @@ nullfetch --json          # machine-readable output
 | `-h`, `--help` | Show help and exit |
 | `--version` | Show version and exit |
 | `--no-logo` | Hide the ASCII logo |
+| `--logo NAME` | Logo to show: `auto`, `none`, or a name from `logos.py` |
 | `--no-color` | Disable colors (also honors `NO_COLOR`) |
 | `-o`, `--only FIELDS` | Show only the listed fields |
 | `--json` | Print system info as JSON |
@@ -118,17 +109,64 @@ nullfetch --json          # machine-readable output
 user host os kernel cpu gpu ram disk
 ```
 
+### Logos
+
+`--logo auto` picks the logo of your distribution. Other values:
+
+```bash
+nullfetch --logo arch
+nullfetch --logo cat
+nullfetch --logo none
+```
+
+Available names: `arch`, `cactus`, `cat`, `coffee`, `computer`, `cow`,
+`debian`, `frog`, `ghost`, `linux`, `moon`, `penguin`, `robot`, `rocket`,
+`skull`, `tree`, `ubuntu`, `void`.
+
+### Shell completion
+
+```bash
+# bash
+source scripts/completions/nullfetch.bash
+
+# zsh
+source scripts/completions/_nullfetch
+
+# fish
+source scripts/completions/nullfetch.fish
+```
+
+## ⚡ Speed
+
+Small on purpose:
+
+| | |
+| :--- | :--- |
+| startup | ~67 ms |
+| output | 8 lines |
+| dependencies | 0 |
+
+Measured on an Intel i7-4600U running Void Linux:
+
+```bash
+time nullfetch >/dev/null
+```
+
 ## 🖼 Example output
 
 ```text
-        .--.       USER: matuha
-       |o_o |      HOST: void
-       |:_/ |      OS: Void Linux
-      //   \ \     kernel: 6.18.60_1
-     (|     | )    CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
-    /'\_   _/`\    GPU: Intel Corporation Haswell-ULT Integrated Graphics Controller
-    \___)=(___/    RAM: 3 / 7 GB      █████░░░░░░░  43%
-                   disk: 31 / 237 GB   ██░░░░░░░░░░  13%
+      ________________         USER: matuha
+     /                \        HOST: void
+    /                  \       OS: Void Linux
+   /                    \      kernel: 6.18.60_1
+  /       ________       \     CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
+ /_______|        |_______\    GPU: Intel Corporation Haswell-ULT Integrated Graphics Controller
+ _________  V0ID   ________    RAM: 2 / 7 GB      ███░░░░░░░░░  29%
+ \       |________|       /    disk: 31 / 237 GB   ██░░░░░░░░░░  13%
+  \                      /
+   \                    /
+    \                  /
+     \________________/
 ```
 
 ## 🤖 JSON output
@@ -176,7 +214,7 @@ The logo is colored with the color of your distribution. Add new colors in
 ```text
 nullfetch/
 ├── nullfetch.py        # the fetch itself
-├── pyproject.toml      # PyPI packaging
+├── pyproject.toml      # packaging metadata and ruff config
 ├── logos.py            # ASCII art collection
 ├── nullfetch.1         # man page
 ├── install.sh          # installer for ~/.local
@@ -185,7 +223,8 @@ nullfetch/
 │   ├── demo.gif        # animated preview
 │   └── demo.svg        # static preview
 ├── scripts/
-│   └── build-deb.sh    # builds dist/*.deb
+│   ├── build-deb.sh    # builds dist/*.deb
+│   └── completions/    # bash, zsh and fish completion
 ├── tests/
 │   └── test_cli.py     # pytest suite
 ├── debian/             # Debian packaging metadata

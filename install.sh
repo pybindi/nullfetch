@@ -7,8 +7,9 @@ cd "$(dirname "$0")"
 prefix=${PREFIX:-$HOME/.local}
 bindir="$prefix/bin"
 
-install -d "$bindir"
+install -d "$bindir" "$prefix/share/nullfetch"
 install -m755 nullfetch.py "$bindir/nullfetch"
+install -m644 logos.py "$prefix/share/nullfetch/logos.py"
 
 echo "installed: $bindir/nullfetch"
 case ":$PATH:" in

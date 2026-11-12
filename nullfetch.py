@@ -2,6 +2,7 @@
 """nullfetch - a tiny system fetch for Linux."""
 
 import getpass
+import importlib.util
 import json
 import os
 import platform
@@ -11,7 +12,7 @@ import sys
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -66,6 +67,38 @@ ART = r"""        .--.
     /'\_   _/`\
     \___)=(___/"""
 
+
+def _load_logos():
+    try:
+        from logos import LOGOS
+
+        return dict(LOGOS)
+    except Exception:
+        pass
+
+    here = Path(__file__).resolve().parent
+    prefix = here.parent
+    for path in (
+        here / "logos.py",
+        prefix / "share" / "nullfetch" / "logos.py",
+        Path("/usr/share/nullfetch/logos.py"),
+        Path("/usr/local/share/nullfetch/logos.py"),
+    ):
+        if not path.is_file():
+            continue
+        try:
+            spec = importlib.util.spec_from_file_location("_nullfetch_logos", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return dict(module.LOGOS)
+        except Exception:
+            continue
+    return {}
+
+
+LOGOS = _load_logos()
+LOGO_NAMES = ", ".join(sorted(LOGOS))
+
 HELP = f"""nullfetch {VERSION} - PC info
 
 Usage:
@@ -75,6 +108,8 @@ Options:
   -h, --help          show this help
       --version       show version
       --no-logo       hide the ASCII logo
+      --logo NAME     logo: auto, none, or one of:
+                      {LOGO_NAMES}
       --no-color      disable colors
   -o, --only FIELDS   show only these fields, comma separated
       --json          print system info as JSON
@@ -84,6 +119,7 @@ Fields:
 
 Examples:
   nullfetch --only cpu,ram
+  nullfetch --logo arch
   nullfetch --no-logo --json
 """
 
@@ -238,6 +274,29 @@ def fg(rgb):
     return f"\033[38;5;{rgb_to_256(r, g, b)}m"
 
 
+# --- logos ----------------------------------------------------------------
+
+
+def logo_lines(name):
+    if name == "none":
+        return []
+
+    if name != "auto":
+        if name not in LOGOS:
+            available = LOGO_NAMES or "none"
+            fail(f"unknown logo: {name} (available: {available})")
+        return LOGOS[name]
+
+    release = os_release()
+    names = [release.get("ID", "").lower()]
+    names += release.get("ID_LIKE", "").lower().split()
+    for key in names:
+        if key in LOGOS:
+            return LOGOS[key]
+
+    return LOGOS.get("linux", ART.splitlines())
+
+
 # --- output ---------------------------------------------------------------
 
 
@@ -255,37 +314,59 @@ def format_size(value, use_color):
     return f"{text:<14}{bar} {percent:>3}%"
 
 
-def info_lines(data, use_color):
+def info_lines(data, use_color, max_width=None):
     lines = []
     for key, value in data.items():
         label = LABELS[key]
+
         if isinstance(value, dict):
-            value = format_size(value, use_color)
-        if use_color:
-            lines.append(f"{BOLD}{label}:{RESET} {value}")
+            text = format_size(value, use_color)
         else:
-            lines.append(f"{label}: {value}")
+            text = value
+            if max_width:
+                room = max_width - len(label) - 2
+                if room > 1 and len(text) > room:
+                    text = text[: room - 1] + "…"
+
+        if use_color:
+            lines.append(f"{BOLD}{label}:{RESET} {text}")
+        else:
+            lines.append(f"{label}: {text}")
     return lines
 
 
-def render(data, show_logo, use_color):
-    lines = info_lines(data, use_color)
-    if not show_logo:
-        return "\n".join(lines)
+def paint_art(art, use_color, width=0):
+    prefix = fg(distro_color()) if use_color else ""
+    suffix = RESET if use_color else ""
 
-    art = ART.splitlines()
-    width = max(len(line) for line in art) + 4
+    lines = []
+    for line in art:
+        if width:
+            line = line.ljust(width)
+        lines.append(prefix + line + suffix)
+    return lines
 
-    if use_color:
-        prefix = fg(distro_color())
-        art = [prefix + line.ljust(width) + RESET for line in art]
-    else:
-        art = [line.ljust(width) for line in art]
+
+def render(data, art, use_color, width=None):
+    if width is None:
+        width = shutil.get_terminal_size((80, 24)).columns
+
+    if not art:
+        return "\n".join(info_lines(data, use_color, width))
+
+    art_width = max(len(line) for line in art) + 4
+
+    if width < art_width + 40:
+        lines = info_lines(data, use_color, width)
+        return "\n".join(paint_art(art, use_color) + [""] + lines)
+
+    lines = info_lines(data, use_color, width - art_width)
+    art = paint_art(art, use_color, art_width)
 
     rows = []
     for left, right in zip_longest(art, lines, fillvalue=""):
         if not left:
-            left = " " * width
+            left = " " * art_width
         rows.append((left + right).rstrip())
     return "\n".join(rows)
 
@@ -304,6 +385,7 @@ def parse_args(argv):
         "help": False,
         "version": False,
         "logo": True,
+        "logo_name": "auto",
         "color": color_enabled(),
         "json": False,
         "only": None,
@@ -319,6 +401,13 @@ def parse_args(argv):
             opts["version"] = True
         elif arg == "--no-logo":
             opts["logo"] = False
+        elif arg == "--logo":
+            i += 1
+            if i == len(argv):
+                fail(f"{arg} needs a value")
+            opts["logo_name"] = argv[i]
+        elif arg.startswith("--logo="):
+            opts["logo_name"] = arg.split("=", 1)[1]
         elif arg == "--no-color":
             opts["color"] = False
         elif arg == "--json":
@@ -368,12 +457,13 @@ def main(argv=None):
         print(json.dumps(data, indent=2, ensure_ascii=False))
         return 0
 
-    print(render(data, opts["logo"], opts["color"]))
+    art = logo_lines(opts["logo_name"]) if opts["logo"] else []
+    print(render(data, art, opts["color"]))
     return 0
 
 
 if __name__ == "__main__":
     try:
-        sys.exit(main(sys.argv[1:]))
+        sys.exit(main())
     except BrokenPipeError:
         sys.exit(0)

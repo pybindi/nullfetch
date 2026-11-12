@@ -1,4 +1,4 @@
-.TH NULLFETCH 1 "2026-11-12" "nullfetch 1.3.0" "User Commands"
+.TH NULLFETCH 1 "2026-11-12" "nullfetch 1.4.0" "User Commands"
 .SH NAME
 nullfetch \- tiny system fetch for Linux
 .SH SYNOPSIS
@@ -19,6 +19,10 @@ Show version and exit.
 .B \-\-no\-logo
 Hide the ASCII logo.
 .TP
+.BR \-\-logo " " \fINAME\fR
+Show the given logo: \fIauto\fR (distribution logo), \fInone\fR, or a name
+from \fBlogos.py\fR.
+.TP
 .B \-\-no\-color
 Disable colors.
 .TP
@@ -36,6 +40,9 @@ Show only the CPU and RAM lines.
 .TP
 .B nullfetch \-\-no\-logo \-\-json
 Print JSON without a logo.
+.TP
+.B nullfetch \-\-logo cat
+Use the cat logo.
 .SH ENVIRONMENT
 .TP
 .B NO_COLOR

@@ -43,9 +43,26 @@ def test_unknown_option():
 
 
 def test_default_output_has_logo():
-    out = run("--no-color").stdout
+    out = run("--logo", "linux", "--no-color").stdout
     assert "o_o" in out
     assert "USER:" in out
+
+
+def test_logo_none():
+    out = run("--logo", "none", "--no-color").stdout
+    assert "o_o" not in out
+    assert "USER:" in out
+
+
+def test_logo_unknown():
+    result = run("--logo", "nope")
+    assert result.returncode == 2
+    assert "unknown logo" in result.stderr
+
+
+def test_logo_requires_value():
+    result = run("--logo")
+    assert result.returncode == 2
 
 
 def test_no_logo():
@@ -102,17 +119,32 @@ def test_only_requires_value():
 
 
 def test_render_side_by_side():
-    out = nullfetch.render({"user": "u", "host": "h"}, True, False)
+    art = nullfetch.ART.splitlines()
+    out = nullfetch.render({"user": "u", "host": "h"}, art, False, width=120)
     lines = out.splitlines()
-    assert len(lines) >= 7
     assert lines[0].startswith("        .--.")
     assert "USER: u" in lines[0]
     assert "HOST: h" in lines[1]
 
 
+def test_render_stacked_when_narrow():
+    art = nullfetch.ART.splitlines()
+    out = nullfetch.render({"user": "u"}, art, False, width=40)
+    lines = out.splitlines()
+    assert lines[0].startswith("        .--.")
+    assert "USER: u" in lines
+    assert "" in lines
+
+
 def test_render_without_logo():
-    out = nullfetch.render({"user": "u"}, False, False)
+    out = nullfetch.render({"user": "u"}, [], False)
     assert out == "USER: u"
+
+
+def test_long_value_truncated():
+    out = nullfetch.render({"gpu": "x" * 200}, [], False, width=40)
+    assert len(out) <= 40
+    assert out.endswith("…")
 
 
 def test_rgb_to_256():

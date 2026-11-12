@@ -32,7 +32,14 @@ Changelog = "https://github.com/pybindi/nullfetch/releases"
 nullfetch = "nullfetch:main"
 
 [tool.setuptools]
-py-modules = ["nullfetch"]
+py-modules = ["nullfetch", "logos"]
 
 [tool.setuptools.dynamic]
 version = { attr = "nullfetch.VERSION" }
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
