@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Check](https://github.com/pybindi/nullfetch/actions/workflows/check.yml/badge.svg)](https://github.com/pybindi/nullfetch/actions/workflows/check.yml)
 
-<img src="assets/demo.gif" alt="nullfetch in a terminal" width="720">
+<img src="assets/demo.gif" alt="nullfetch in a terminal" width="900">
 
 </div>
 
@@ -19,7 +19,6 @@
 
 - 👤 user and hostname
 - 🐧 distribution and kernel
-- ⌨️ shell and terminal
 - 🖥️ CPU and GPU
 - 🧠 RAM and disk usage
 - 🎨 logo colored with your distro's color (truecolor, 256-color fallback)
@@ -70,7 +69,7 @@ for GPU detection.
 A prebuilt `.deb` is attached to every release:
 
 ```bash
-sudo apt install ./nullfetch_1.2.2_all.deb
+sudo apt install ./nullfetch_1.2.3_all.deb
 ```
 
 Or build it from source:
@@ -78,7 +77,7 @@ Or build it from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_1.2.2_all.deb
+sudo apt install ./dist/nullfetch_1.2.3_all.deb
 ```
 
 ## 🚀 Usage
@@ -104,7 +103,7 @@ nullfetch --json          # machine-readable output
 ### Fields
 
 ```text
-user host os kernel shell terminal cpu gpu ram disk
+user host os kernel cpu gpu ram disk
 ```
 
 ## 🖼 Example output
@@ -114,11 +113,9 @@ user host os kernel shell terminal cpu gpu ram disk
        |o_o |      HOST: void
        |:_/ |      OS: Void Linux
       //   \ \     kernel: 6.18.60_1
-     (|     | )    shell: bash
-    /'\_   _/`\    terminal: xterm-256color
-    \___)=(___/    CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
-                   GPU: Intel Corporation Haswell-ULT Integrated Graphics Controller
-                   RAM: 3 / 7 GB
+     (|     | )    CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
+    /'\_   _/`\    GPU: Intel Corporation Haswell-ULT Integrated Graphics Controller
+    \___)=(___/    RAM: 3 / 7 GB
                    disk: 31 / 237 GB
 ```
 
@@ -134,8 +131,6 @@ nullfetch --json
   "host": "void",
   "os": "Void Linux",
   "kernel": "6.18.60_1",
-  "shell": "bash",
-  "terminal": "xterm-256color",
   "cpu": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz",
   "gpu": "Intel Corporation Haswell-ULT Integrated Graphics Controller",
   "ram": "3 / 7 GB",

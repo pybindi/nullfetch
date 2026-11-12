@@ -11,7 +11,7 @@ import sys
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "1.2.2"
+VERSION = "1.2.3"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -21,8 +21,6 @@ FIELDS = [
     "host",
     "os",
     "kernel",
-    "shell",
-    "terminal",
     "cpu",
     "gpu",
     "ram",
@@ -34,8 +32,6 @@ LABELS = {
     "host": "HOST",
     "os": "OS",
     "kernel": "kernel",
-    "shell": "shell",
-    "terminal": "terminal",
     "cpu": "CPU",
     "gpu": "GPU",
     "ram": "RAM",
@@ -128,14 +124,6 @@ def get_kernel():
     return platform.release()
 
 
-def get_shell():
-    return os.path.basename(os.environ.get("SHELL", "")) or "?"
-
-
-def get_terminal():
-    return os.environ.get("TERM", "?")
-
-
 def get_cpu():
     for line in read("/proc/cpuinfo").splitlines():
         if line.startswith("model name"):
@@ -192,8 +180,6 @@ GETTERS = {
     "host": get_host,
     "os": get_os,
     "kernel": get_kernel,
-    "shell": get_shell,
-    "terminal": get_terminal,
     "cpu": get_cpu,
     "gpu": get_gpu,
     "ram": get_ram,

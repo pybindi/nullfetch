@@ -1,3 +1,9 @@
+nullfetch (1.2.3) unstable; urgency=medium
+
+  * Remove the shell and terminal fields.
+
+ -- pybindi <sungunboom@gmail.com>  Thu, 12 Nov 2026 17:40:00 +0000
+
 nullfetch (1.2.2) unstable; urgency=medium
 
   * Remove the uptime field.
