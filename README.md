@@ -156,7 +156,7 @@ Small on purpose:
 
 | | |
 | :--- | :--- |
-| startup | ~67 ms |
+| startup | ~68 ms |
 | output | 8 lines |
 | dependencies | 0 |
 
