@@ -1,7 +1,7 @@
 complete -c nullfetch -s h -l help -d 'Show help'
 complete -c nullfetch -l version -d 'Show version'
 complete -c nullfetch -l no-logo -d 'Hide the ASCII logo'
-complete -c nullfetch -l logo -x -a 'auto none arch cat cactus coffee computer cow debian frog ghost linux moon penguin robot rocket skull tree ubuntu void' -d 'Logo to show'
+complete -c nullfetch -l logo -x -a 'auto none alpine arch cactus cat coffee computer cow debian fedora frog gentoo ghost linux mint moon nixos opensuse penguin robot rocket skull tree ubuntu void' -d 'Logo to show'
 complete -c nullfetch -l no-color -d 'Disable colors'
 complete -c nullfetch -s o -l only -x -a 'user host os kernel cpu gpu ram disk' -d 'Show only these fields'
 complete -c nullfetch -l json -d 'Print system info as JSON'

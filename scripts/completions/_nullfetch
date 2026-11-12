@@ -5,7 +5,7 @@ _nullfetch() {
         '(-h --help)'{-h,--help}'[show help]' \
         '--version[show version]' \
         '--no-logo[hide the ASCII logo]' \
-        '--logo[logo to show]:logo:(auto none arch cat cactus coffee computer cow debian frog ghost linux moon penguin robot rocket skull tree ubuntu void)' \
+        '--logo[logo to show]:logo:(auto none alpine arch cactus cat coffee computer cow debian fedora frog gentoo ghost linux mint moon nixos opensuse penguin robot rocket skull tree ubuntu void)' \
         '--no-color[disable colors]' \
         '(-o --only)'{-o,--only}'[show only these fields]:fields:(user host os kernel cpu gpu ram disk)' \
         '--json[print system info as JSON]'

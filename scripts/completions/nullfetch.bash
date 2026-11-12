@@ -9,7 +9,7 @@ _nullfetch() {
         return
         ;;
     --logo)
-        COMPREPLY=($(compgen -W "auto none arch cat cactus coffee computer cow debian frog ghost linux moon penguin robot rocket skull tree ubuntu void" -- "$cur"))
+        COMPREPLY=($(compgen -W "auto none alpine arch cactus cat coffee computer cow debian fedora frog gentoo ghost linux mint moon nixos opensuse penguin robot rocket skull tree ubuntu void" -- "$cur"))
         return
         ;;
     esac

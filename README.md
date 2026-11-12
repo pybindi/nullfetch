@@ -25,6 +25,9 @@
 - 🧩 text next to the logo, like a real fetch
 - 🖼 `--logo NAME` to pick any logo from `logos.py`
 - 📐 adapts to narrow terminals instead of wrapping
+- 🔤 `--ascii` for terminals without block characters
+- 📏 `--width N` and `--oneline` for scripts and status bars
+- 🎛 `--accent COLOR` and `--logo-file FILE`
 - 🙈 `--no-logo` for a text-only output
 - 🎯 `--only` to pick fields
 - 🤖 `--json` for scripts
@@ -71,7 +74,7 @@ for GPU detection.
 A prebuilt `.deb` is attached to every release:
 
 ```bash
-sudo apt install ./nullfetch_1.4.0_all.deb
+sudo apt install ./nullfetch_1.5.0_all.deb
 ```
 
 Or build it from source:
@@ -79,16 +82,19 @@ Or build it from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_1.4.0_all.deb
+sudo apt install ./dist/nullfetch_1.5.0_all.deb
 ```
 
 ## 🚀 Usage
 
 ```bash
-nullfetch                 # logo + system info
-nullfetch --only cpu,ram  # just two lines
-nullfetch --no-logo       # text only
-nullfetch --json          # machine-readable output
+nullfetch                    # logo + system info
+nullfetch --only cpu,ram     # just two lines
+nullfetch --no-logo          # text only
+nullfetch --json             # machine-readable output
+nullfetch --oneline          # one line for a status bar
+nullfetch --ascii            # no block characters
+nullfetch --accent '#ff0000' # red logo
 ```
 
 ### Options
@@ -99,7 +105,12 @@ nullfetch --json          # machine-readable output
 | `--version` | Show version and exit |
 | `--no-logo` | Hide the ASCII logo |
 | `--logo NAME` | Logo to show: `auto`, `none`, or a name from `logos.py` |
+| `--logo-file FILE` | Use a custom ASCII art file |
+| `--accent COLOR` | Accent color in `#rrggbb` |
 | `--no-color` | Disable colors (also honors `NO_COLOR`) |
+| `--ascii` | ASCII-only bars, ellipsis and separators |
+| `--width N` | Output width in columns |
+| `--oneline` | One compact line for status bars |
 | `-o`, `--only FIELDS` | Show only the listed fields |
 | `--json` | Print system info as JSON |
 
@@ -119,9 +130,12 @@ nullfetch --logo cat
 nullfetch --logo none
 ```
 
-Available names: `arch`, `cactus`, `cat`, `coffee`, `computer`, `cow`,
-`debian`, `frog`, `ghost`, `linux`, `moon`, `penguin`, `robot`, `rocket`,
-`skull`, `tree`, `ubuntu`, `void`.
+Available names: `alpine`, `arch`, `cactus`, `cat`, `coffee`, `computer`,
+`cow`, `debian`, `fedora`, `frog`, `gentoo`, `ghost`, `linux`, `mint`, `moon`,
+`nixos`, `opensuse`, `penguin`, `robot`, `rocket`, `skull`, `tree`, `ubuntu`,
+`void`.
+
+<img src="assets/logos.png" alt="Built-in logos" width="100%">
 
 ### Shell completion
 
@@ -221,7 +235,8 @@ nullfetch/
 ├── assets/
 │   ├── banner.png      # README header
 │   ├── demo.gif        # animated preview
-│   └── demo.svg        # static preview
+│   ├── demo.svg        # static preview
+│   └── logos.png       # gallery of built-in logos
 ├── scripts/
 │   ├── build-deb.sh    # builds dist/*.deb
 │   └── completions/    # bash, zsh and fish completion

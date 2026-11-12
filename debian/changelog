@@ -1,3 +1,11 @@
+nullfetch (1.5.0) unstable; urgency=medium
+
+  * Add --ascii, --width, --oneline, --accent and --logo-file.
+  * Add logos for Fedora, openSUSE, Alpine, NixOS, Gentoo and Mint.
+  * Add a logo gallery and coverage checks in CI.
+
+ -- pybindi <sungunboom@gmail.com>  Thu, 12 Nov 2026 19:00:00 +0000
+
 nullfetch (1.4.0) unstable; urgency=medium
 
   * Add distro logos and the --logo option.

@@ -12,7 +12,7 @@ import sys
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -110,7 +110,12 @@ Options:
       --no-logo       hide the ASCII logo
       --logo NAME     logo: auto, none, or one of:
                       {LOGO_NAMES}
+      --logo-file F   use a custom ASCII art file
+      --accent COLOR  accent color, e.g. #ff0000
       --no-color      disable colors
+      --ascii         ASCII-only bars and ellipsis
+      --width N       output width in columns
+      --oneline       one compact line for status bars
   -o, --only FIELDS   show only these fields, comma separated
       --json          print system info as JSON
 
@@ -120,6 +125,7 @@ Fields:
 Examples:
   nullfetch --only cpu,ram
   nullfetch --logo arch
+  nullfetch --oneline --only ram,disk
   nullfetch --no-logo --json
 """
 
@@ -300,33 +306,36 @@ def logo_lines(name):
 # --- output ---------------------------------------------------------------
 
 
-def format_size(value, use_color):
+def format_size(value, use_color, accent=None, ascii_mode=False):
     text = f"{value['used']} / {value['total']} GB"
     percent = value["percent"]
     filled = round(percent / 100 * BAR_WIDTH)
     empty = BAR_WIDTH - filled
 
+    full, blank = ("#", "-") if ascii_mode else ("█", "░")
+
     if use_color:
-        bar = f"{fg(distro_color())}{'█' * filled}{RESET}{'░' * empty}"
+        bar = f"{fg(accent or distro_color())}{full * filled}{RESET}{blank * empty}"
     else:
-        bar = "█" * filled + "░" * empty
+        bar = full * filled + blank * empty
 
     return f"{text:<14}{bar} {percent:>3}%"
 
 
-def info_lines(data, use_color, max_width=None):
+def info_lines(data, use_color, max_width=None, accent=None, ascii_mode=False):
     lines = []
     for key, value in data.items():
         label = LABELS[key]
 
         if isinstance(value, dict):
-            text = format_size(value, use_color)
+            text = format_size(value, use_color, accent, ascii_mode)
         else:
             text = value
             if max_width:
                 room = max_width - len(label) - 2
                 if room > 1 and len(text) > room:
-                    text = text[: room - 1] + "…"
+                    ellipsis = "..." if ascii_mode else "…"
+                    text = text[: room - len(ellipsis)] + ellipsis
 
         if use_color:
             lines.append(f"{BOLD}{label}:{RESET} {text}")
@@ -335,8 +344,8 @@ def info_lines(data, use_color, max_width=None):
     return lines
 
 
-def paint_art(art, use_color, width=0):
-    prefix = fg(distro_color()) if use_color else ""
+def paint_art(art, use_color, width=0, accent=None):
+    prefix = fg(accent or distro_color()) if use_color else ""
     suffix = RESET if use_color else ""
 
     lines = []
@@ -347,21 +356,21 @@ def paint_art(art, use_color, width=0):
     return lines
 
 
-def render(data, art, use_color, width=None):
+def render(data, art, use_color, width=None, accent=None, ascii_mode=False):
     if width is None:
         width = shutil.get_terminal_size((80, 24)).columns
 
     if not art:
-        return "\n".join(info_lines(data, use_color, width))
+        return "\n".join(info_lines(data, use_color, width, accent, ascii_mode))
 
     art_width = max(len(line) for line in art) + 4
 
     if width < art_width + 40:
-        lines = info_lines(data, use_color, width)
-        return "\n".join(paint_art(art, use_color) + [""] + lines)
+        lines = info_lines(data, use_color, width, accent, ascii_mode)
+        return "\n".join(paint_art(art, use_color, accent=accent) + [""] + lines)
 
-    lines = info_lines(data, use_color, width - art_width)
-    art = paint_art(art, use_color, art_width)
+    lines = info_lines(data, use_color, width - art_width, accent, ascii_mode)
+    art = paint_art(art, use_color, art_width, accent)
 
     rows = []
     for left, right in zip_longest(art, lines, fillvalue=""):
@@ -369,6 +378,44 @@ def render(data, art, use_color, width=None):
             left = " " * art_width
         rows.append((left + right).rstrip())
     return "\n".join(rows)
+
+
+def oneline(data, ascii_mode=False):
+    parts = []
+    if "user" in data and "host" in data:
+        parts.append(f"{data['user']}@{data['host']}")
+
+    for key, value in data.items():
+        if key in ("user", "host"):
+            continue
+        if isinstance(value, dict):
+            parts.append(f"{value['used']}/{value['total']} GB {value['percent']}%")
+        else:
+            parts.append(str(value))
+
+    separator = " | " if ascii_mode else " · "
+    return separator.join(parts)
+
+
+def parse_color(text):
+    if len(text) == 7 and text.startswith("#"):
+        try:
+            return tuple(int(text[i : i + 2], 16) for i in (1, 3, 5))
+        except ValueError:
+            pass
+    fail(f"invalid color: {text} (expected #rrggbb)")
+
+
+def read_logo_file(path):
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        fail(f"cannot read logo file: {path}")
+
+    lines = text.rstrip("\n").splitlines()
+    if not lines:
+        fail(f"logo file is empty: {path}")
+    return lines
 
 
 # --- command line ---------------------------------------------------------
@@ -380,13 +427,28 @@ def fail(message):
     sys.exit(2)
 
 
+def parse_width(text):
+    try:
+        width = int(text)
+    except ValueError:
+        fail(f"invalid width: {text}")
+    if width < 20:
+        fail(f"width must be at least 20: {text}")
+    return width
+
+
 def parse_args(argv):
     opts = {
         "help": False,
         "version": False,
         "logo": True,
         "logo_name": "auto",
+        "logo_file": None,
+        "accent": None,
         "color": color_enabled(),
+        "ascii": False,
+        "width": None,
+        "oneline": False,
         "json": False,
         "only": None,
     }
@@ -408,6 +470,31 @@ def parse_args(argv):
             opts["logo_name"] = argv[i]
         elif arg.startswith("--logo="):
             opts["logo_name"] = arg.split("=", 1)[1]
+        elif arg == "--logo-file":
+            i += 1
+            if i == len(argv):
+                fail(f"{arg} needs a value")
+            opts["logo_file"] = argv[i]
+        elif arg.startswith("--logo-file="):
+            opts["logo_file"] = arg.split("=", 1)[1]
+        elif arg == "--accent":
+            i += 1
+            if i == len(argv):
+                fail(f"{arg} needs a value")
+            opts["accent"] = argv[i]
+        elif arg.startswith("--accent="):
+            opts["accent"] = arg.split("=", 1)[1]
+        elif arg == "--ascii":
+            opts["ascii"] = True
+        elif arg == "--width":
+            i += 1
+            if i == len(argv):
+                fail(f"{arg} needs a value")
+            opts["width"] = parse_width(argv[i])
+        elif arg.startswith("--width="):
+            opts["width"] = parse_width(arg.split("=", 1)[1])
+        elif arg == "--oneline":
+            opts["oneline"] = True
         elif arg == "--no-color":
             opts["color"] = False
         elif arg == "--json":
@@ -450,6 +537,8 @@ def main(argv=None):
         unknown = [name for name in fields if name not in FIELDS]
         if unknown:
             fail(f"unknown field: {', '.join(unknown)}")
+    elif opts["oneline"]:
+        fields = ["user", "host", "os", "kernel", "ram", "disk"]
 
     data = collect(fields)
 
@@ -457,8 +546,29 @@ def main(argv=None):
         print(json.dumps(data, indent=2, ensure_ascii=False))
         return 0
 
-    art = logo_lines(opts["logo_name"]) if opts["logo"] else []
-    print(render(data, art, opts["color"]))
+    if opts["oneline"]:
+        print(oneline(data, opts["ascii"]))
+        return 0
+
+    accent = parse_color(opts["accent"]) if opts["accent"] else None
+
+    if not opts["logo"]:
+        art = []
+    elif opts["logo_file"]:
+        art = read_logo_file(opts["logo_file"])
+    else:
+        art = logo_lines(opts["logo_name"])
+
+    print(
+        render(
+            data,
+            art,
+            opts["color"],
+            width=opts["width"],
+            accent=accent,
+            ascii_mode=opts["ascii"],
+        )
+    )
     return 0
 
 

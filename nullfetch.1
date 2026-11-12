@@ -1,4 +1,4 @@
-.TH NULLFETCH 1 "2026-11-12" "nullfetch 1.4.0" "User Commands"
+.TH NULLFETCH 1 "2026-11-12" "nullfetch 1.5.0" "User Commands"
 .SH NAME
 nullfetch \- tiny system fetch for Linux
 .SH SYNOPSIS
@@ -23,8 +23,23 @@ Hide the ASCII logo.
 Show the given logo: \fIauto\fR (distribution logo), \fInone\fR, or a name
 from \fBlogos.py\fR.
 .TP
+.BR \-\-logo\-file " " \fIFILE\fR
+Use a custom ASCII art file.
+.TP
+.BR \-\-accent " " \fICOLOR\fR
+Accent color in \fB#rrggbb\fR form.
+.TP
 .B \-\-no\-color
 Disable colors.
+.TP
+.B \-\-ascii
+Use ASCII-only bars, ellipsis and separators.
+.TP
+.BR \-\-width " " \fIN\fR
+Output width in columns.
+.TP
+.B \-\-oneline
+Print one compact line for status bars.
 .TP
 .BR \-o ", " \-\-only " " \fIFIELDS\fR
 Show only the given fields, comma separated.
@@ -43,6 +58,9 @@ Print JSON without a logo.
 .TP
 .B nullfetch \-\-logo cat
 Use the cat logo.
+.TP
+.B nullfetch \-\-oneline \-\-only ram,disk
+One compact line with memory and disk usage.
 .SH ENVIRONMENT
 .TP
 .B NO_COLOR

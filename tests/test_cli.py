@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "nullfetch.py"
 
@@ -12,6 +14,7 @@ import nullfetch  # noqa: E402
 
 ENV = {key: value for key, value in os.environ.items() if key != "NO_COLOR"}
 ENV["TERM"] = "xterm-256color"
+ENV["COLORTERM"] = "truecolor"
 
 
 def run(*args):
@@ -164,3 +167,120 @@ def test_main_without_argv(monkeypatch, capsys):
     monkeypatch.setattr("sys.argv", ["nullfetch", "--version"])
     assert nullfetch.main() == 0
     assert capsys.readouterr().out.strip() == f"nullfetch {nullfetch.VERSION}"
+
+
+def test_ascii_bars():
+    out = run("--ascii", "--no-color", "--logo", "none").stdout
+    assert "#" in out
+    assert "-" in out
+    assert "█" not in out
+
+
+def test_width_option():
+    out = run("--width", "50", "--no-color").stdout
+    assert max(len(line) for line in out.splitlines()) <= 50
+
+
+def test_width_invalid():
+    assert run("--width", "5").returncode == 2
+
+
+def test_oneline():
+    out = run("--oneline", "--no-color").stdout.strip()
+    assert len(out.splitlines()) == 1
+    assert "@" in out
+    assert "·" in out
+
+
+def test_oneline_ascii():
+    out = run("--oneline", "--ascii", "--no-color").stdout
+    assert "·" not in out
+    assert " | " in out
+
+
+def test_accent():
+    out = run("--accent", "#ff0000", "--logo", "linux").stdout
+    assert "38;2;255;0;0" in out
+
+
+def test_accent_invalid():
+    result = run("--accent", "red")
+    assert result.returncode == 2
+    assert "invalid color" in result.stderr
+
+
+def test_logo_file(tmp_path):
+    path = tmp_path / "art.txt"
+    path.write_text("(o.o)\n")
+    out = run("--logo-file", str(path), "--no-color").stdout
+    assert "(o.o)" in out
+
+
+def test_logo_file_missing():
+    result = run("--logo-file", "/nonexistent/art.txt")
+    assert result.returncode == 2
+    assert "cannot read" in result.stderr
+
+
+def test_distro_logos_present():
+    for name in ("fedora", "opensuse", "alpine", "nixos", "gentoo", "mint"):
+        assert name in nullfetch.LOGOS
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--version"],
+        ["--help"],
+        ["--no-color", "--logo", "none"],
+        ["--json"],
+        ["--oneline"],
+        ["--ascii", "--no-color"],
+        ["--width", "60"],
+        ["--accent", "#00ff00"],
+        ["--only", "user"],
+        ["--logo", "cat", "--no-color"],
+        ["--logo", "arch", "--no-color"],
+    ],
+)
+def test_main_success(args, capsys):
+    assert nullfetch.main(args) == 0
+    assert capsys.readouterr().out
+
+
+def test_main_json(capsys):
+    assert nullfetch.main(["--json", "--only", "user"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert set(data) == {"user"}
+
+
+def test_main_errors(capsys):
+    for args in (["--only"], ["--only", "nope"], ["--logo"], ["--width", "abc"]):
+        with pytest.raises(SystemExit):
+            nullfetch.main(args)
+        capsys.readouterr()
+
+
+def test_system_getters():
+    assert nullfetch.get_user()
+    assert nullfetch.get_host()
+    assert nullfetch.get_os()
+    assert nullfetch.get_kernel()
+    assert nullfetch.get_cpu()
+    assert nullfetch.read("/proc/uptime")
+    assert nullfetch.os_release()
+
+
+def test_size_values():
+    ram = nullfetch.get_ram()
+    assert set(ram) == {"used", "total", "percent"}
+    assert 0 <= ram["percent"] <= 100
+
+    disk = nullfetch.get_disk()
+    assert set(disk) == {"used", "total", "percent"}
+    assert nullfetch.size_value(0, 0)["percent"] == 0
+
+
+def test_distro_color_and_fg():
+    assert len(nullfetch.distro_color()) == 3
+    assert nullfetch.fg((1, 2, 3)).startswith("\033[38;")
