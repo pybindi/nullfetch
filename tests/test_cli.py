@@ -69,7 +69,12 @@ def test_json():
     assert result.returncode == 0
     data = json.loads(result.stdout)
     assert set(data) == set(nullfetch.FIELDS)
-    assert all(isinstance(value, str) and value for value in data.values())
+    for key, value in data.items():
+        if key in ("ram", "disk"):
+            assert set(value) == {"used", "total", "percent"}
+            assert 0 <= value["percent"] <= 100
+        else:
+            assert isinstance(value, str) and value
 
 
 def test_only():
@@ -114,3 +119,16 @@ def test_rgb_to_256():
     assert nullfetch.rgb_to_256(0, 0, 0) == 16
     assert nullfetch.rgb_to_256(255, 255, 255) == 231
     assert 16 <= nullfetch.rgb_to_256(71, 128, 97) <= 231
+
+
+def test_format_size():
+    line = nullfetch.format_size({"used": 1, "total": 4, "percent": 25}, False)
+    assert "1 / 4 GB" in line
+    assert "25%" in line
+    assert line.count("█") + line.count("░") == nullfetch.BAR_WIDTH
+
+
+def test_main_without_argv(monkeypatch, capsys):
+    monkeypatch.setattr("sys.argv", ["nullfetch", "--version"])
+    assert nullfetch.main() == 0
+    assert capsys.readouterr().out.strip() == f"nullfetch {nullfetch.VERSION}"

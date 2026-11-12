@@ -20,7 +20,7 @@
 - 👤 user and hostname
 - 🐧 distribution and kernel
 - 🖥️ CPU and GPU
-- 🧠 RAM and disk usage
+- 🧠 RAM and disk usage with bars and percentages
 - 🎨 logo colored with your distro's color (truecolor, 256-color fallback)
 - 🧩 text next to the logo, like a real fetch
 - 🙈 `--no-logo` for a text-only output
@@ -29,6 +29,18 @@
 - 📦 standard library only — nothing to install
 
 ## 📥 Installation
+
+### PyPI
+
+```bash
+pipx install nullfetch
+```
+
+or, without `pipx`:
+
+```bash
+pip install --user nullfetch
+```
 
 ### Any Linux
 
@@ -69,7 +81,7 @@ for GPU detection.
 A prebuilt `.deb` is attached to every release:
 
 ```bash
-sudo apt install ./nullfetch_1.2.3_all.deb
+sudo apt install ./nullfetch_1.3.0_all.deb
 ```
 
 Or build it from source:
@@ -77,7 +89,7 @@ Or build it from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_1.2.3_all.deb
+sudo apt install ./dist/nullfetch_1.3.0_all.deb
 ```
 
 ## 🚀 Usage
@@ -115,8 +127,8 @@ user host os kernel cpu gpu ram disk
       //   \ \     kernel: 6.18.60_1
      (|     | )    CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
     /'\_   _/`\    GPU: Intel Corporation Haswell-ULT Integrated Graphics Controller
-    \___)=(___/    RAM: 3 / 7 GB
-                   disk: 31 / 237 GB
+    \___)=(___/    RAM: 3 / 7 GB      █████░░░░░░░  43%
+                   disk: 31 / 237 GB   ██░░░░░░░░░░  13%
 ```
 
 ## 🤖 JSON output
@@ -133,8 +145,8 @@ nullfetch --json
   "kernel": "6.18.60_1",
   "cpu": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz",
   "gpu": "Intel Corporation Haswell-ULT Integrated Graphics Controller",
-  "ram": "3 / 7 GB",
-  "disk": "31 / 237 GB"
+  "ram": { "used": 3, "total": 7, "percent": 43 },
+  "disk": { "used": 31, "total": 237, "percent": 13 }
 }
 ```
 
@@ -164,6 +176,7 @@ The logo is colored with the color of your distribution. Add new colors in
 ```text
 nullfetch/
 ├── nullfetch.py        # the fetch itself
+├── pyproject.toml      # PyPI packaging
 ├── logos.py            # ASCII art collection
 ├── nullfetch.1         # man page
 ├── install.sh          # installer for ~/.local

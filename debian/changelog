@@ -1,3 +1,10 @@
+nullfetch (1.3.0) unstable; urgency=medium
+
+  * Add bars and percentages for RAM and disk.
+  * Add PyPI packaging.
+
+ -- pybindi <sungunboom@gmail.com>  Thu, 12 Nov 2026 18:00:00 +0000
+
 nullfetch (1.2.3) unstable; urgency=medium
 
   * Remove the shell and terminal fields.

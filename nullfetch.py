@@ -11,10 +11,11 @@ import sys
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "1.2.3"
+VERSION = "1.3.0"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
+BAR_WIDTH = 12
 
 FIELDS = [
     "user",
@@ -146,6 +147,11 @@ def get_gpu():
     return "?"
 
 
+def size_value(used, total):
+    percent = round(used / total * 100) if total else 0
+    return {"used": used, "total": total, "percent": percent}
+
+
 def get_ram():
     info = {}
     for line in read("/proc/meminfo").splitlines():
@@ -160,7 +166,7 @@ def get_ram():
 
     total = total_kb // 1024 // 1024
     used = (total_kb - available_kb) // 1024 // 1024
-    return f"{used} / {total} GB"
+    return size_value(used, total)
 
 
 def get_disk():
@@ -172,7 +178,7 @@ def get_disk():
     gb = 1024 ** 3
     total = st.f_blocks * st.f_frsize
     free = st.f_bavail * st.f_frsize
-    return f"{(total - free) // gb} / {total // gb} GB"
+    return size_value((total - free) // gb, total // gb)
 
 
 GETTERS = {
@@ -235,10 +241,26 @@ def fg(rgb):
 # --- output ---------------------------------------------------------------
 
 
+def format_size(value, use_color):
+    text = f"{value['used']} / {value['total']} GB"
+    percent = value["percent"]
+    filled = round(percent / 100 * BAR_WIDTH)
+    empty = BAR_WIDTH - filled
+
+    if use_color:
+        bar = f"{fg(distro_color())}{'█' * filled}{RESET}{'░' * empty}"
+    else:
+        bar = "█" * filled + "░" * empty
+
+    return f"{text:<14}{bar} {percent:>3}%"
+
+
 def info_lines(data, use_color):
     lines = []
     for key, value in data.items():
         label = LABELS[key]
+        if isinstance(value, dict):
+            value = format_size(value, use_color)
         if use_color:
             lines.append(f"{BOLD}{label}:{RESET} {value}")
         else:
@@ -316,7 +338,10 @@ def parse_args(argv):
     return opts
 
 
-def main(argv):
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+
     opts = parse_args(argv)
 
     if opts["help"]:

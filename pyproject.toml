@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nullfetch"
+dynamic = ["version"]
+description = "A tiny system fetch for Linux — pure Python, zero dependencies"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "pybindi", email = "sungunboom@gmail.com" }]
+keywords = ["fetch", "system", "linux", "neofetch", "cli", "sysinfo"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/pybindi/nullfetch"
+Repository = "https://github.com/pybindi/nullfetch"
+Issues = "https://github.com/pybindi/nullfetch/issues"
+Changelog = "https://github.com/pybindi/nullfetch/releases"
+
+[project.scripts]
+nullfetch = "nullfetch:main"
+
+[tool.setuptools]
+py-modules = ["nullfetch"]
+
+[tool.setuptools.dynamic]
+version = { attr = "nullfetch.VERSION" }
