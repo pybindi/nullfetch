@@ -18,7 +18,7 @@
 ## ✨ Features
 
 - 👤 user and hostname
-- 🐧 distribution, kernel, uptime
+- 🐧 distribution and kernel
 - ⌨️ shell and terminal
 - 🖥️ CPU and GPU
 - 🧠 RAM and disk usage
@@ -70,7 +70,7 @@ for GPU detection.
 A prebuilt `.deb` is attached to every release:
 
 ```bash
-sudo apt install ./nullfetch_1.2.1_all.deb
+sudo apt install ./nullfetch_1.2.2_all.deb
 ```
 
 Or build it from source:
@@ -78,7 +78,7 @@ Or build it from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_1.2.1_all.deb
+sudo apt install ./dist/nullfetch_1.2.2_all.deb
 ```
 
 ## 🚀 Usage
@@ -104,7 +104,7 @@ nullfetch --json          # machine-readable output
 ### Fields
 
 ```text
-user host os kernel uptime shell terminal cpu gpu ram disk
+user host os kernel shell terminal cpu gpu ram disk
 ```
 
 ## 🖼 Example output
@@ -114,10 +114,9 @@ user host os kernel uptime shell terminal cpu gpu ram disk
        |o_o |      HOST: void
        |:_/ |      OS: Void Linux
       //   \ \     kernel: 6.18.60_1
-     (|     | )    uptime: 2d 3h 14m
-    /'\_   _/`\    shell: bash
-    \___)=(___/    terminal: xterm-256color
-                   CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
+     (|     | )    shell: bash
+    /'\_   _/`\    terminal: xterm-256color
+    \___)=(___/    CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
                    GPU: Intel Corporation Haswell-ULT Integrated Graphics Controller
                    RAM: 3 / 7 GB
                    disk: 31 / 237 GB
@@ -135,7 +134,6 @@ nullfetch --json
   "host": "void",
   "os": "Void Linux",
   "kernel": "6.18.60_1",
-  "uptime": "2d 3h 14m",
   "shell": "bash",
   "terminal": "xterm-256color",
   "cpu": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz",

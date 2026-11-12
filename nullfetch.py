@@ -11,7 +11,7 @@ import sys
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -21,7 +21,6 @@ FIELDS = [
     "host",
     "os",
     "kernel",
-    "uptime",
     "shell",
     "terminal",
     "cpu",
@@ -35,7 +34,6 @@ LABELS = {
     "host": "HOST",
     "os": "OS",
     "kernel": "kernel",
-    "uptime": "uptime",
     "shell": "shell",
     "terminal": "terminal",
     "cpu": "CPU",
@@ -130,25 +128,6 @@ def get_kernel():
     return platform.release()
 
 
-def get_uptime():
-    try:
-        seconds = int(float(read("/proc/uptime").split()[0]))
-    except (IndexError, ValueError):
-        return "?"
-
-    days, rest = divmod(seconds, 86400)
-    hours, rest = divmod(rest, 3600)
-    minutes = rest // 60
-
-    parts = []
-    if days:
-        parts.append(f"{days}d")
-    if hours:
-        parts.append(f"{hours}h")
-    parts.append(f"{minutes}m")
-    return " ".join(parts)
-
-
 def get_shell():
     return os.path.basename(os.environ.get("SHELL", "")) or "?"
 
@@ -213,7 +192,6 @@ GETTERS = {
     "host": get_host,
     "os": get_os,
     "kernel": get_kernel,
-    "uptime": get_uptime,
     "shell": get_shell,
     "terminal": get_terminal,
     "cpu": get_cpu,

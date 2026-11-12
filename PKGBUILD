@@ -1,6 +1,6 @@
 # Maintainer: pybindi <sungunboom@gmail.com>
 pkgname=nullfetch
-pkgver=1.2.1
+pkgver=1.2.2
 pkgrel=1
 pkgdesc="A tiny system fetch for Linux — pure Python, zero dependencies"
 arch=('any')
@@ -9,7 +9,7 @@ license=('MIT')
 depends=('python')
 optdepends=('pciutils: GPU detection with lspci')
 source=("$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('d5b01275ee09127dfc9ef182204bd26374e6419fc5cdffbece289133825c5de6')
+sha256sums=("SKIP")
 
 package() {
     cd "nullfetch-$pkgver"
