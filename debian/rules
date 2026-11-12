@@ -10,6 +10,7 @@ override_dh_auto_install:
 	install -Dm755 nullfetch.py debian/nullfetch/usr/bin/nullfetch
 	install -Dm644 logos.py debian/nullfetch/usr/share/doc/nullfetch/logos.py
 	install -Dm644 README.md debian/nullfetch/usr/share/doc/nullfetch/README.md
+	install -Dm644 nullfetch.1 debian/nullfetch/usr/share/man/man1/nullfetch.1
 
 override_dh_auto_test:
 	# nothing to test

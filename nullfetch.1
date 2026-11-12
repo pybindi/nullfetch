@@ -1,0 +1,45 @@
+.TH NULLFETCH 1 "2026-11-12" "nullfetch 1.2.0" "User Commands"
+.SH NAME
+nullfetch \- tiny system fetch for Linux
+.SH SYNOPSIS
+.B nullfetch
+.RI [ options ]
+.SH DESCRIPTION
+.B nullfetch
+prints system information next to an ASCII logo. It uses only the Python
+standard library and needs no configuration.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Show help and exit.
+.TP
+.B \-\-version
+Show version and exit.
+.TP
+.B \-\-no\-logo
+Hide the ASCII logo.
+.TP
+.B \-\-no\-color
+Disable colors.
+.TP
+.BR \-o ", " \-\-only " " \fIFIELDS\fR
+Show only the given fields, comma separated.
+.TP
+.B \-\-json
+Print system information as JSON.
+.SH FIELDS
+user, host, os, kernel, uptime, shell, terminal, de, cpu, gpu, ram, disk,
+packages
+.SH EXAMPLES
+.TP
+.B nullfetch \-\-only cpu,ram
+Show only the CPU and RAM lines.
+.TP
+.B nullfetch \-\-no\-logo \-\-json
+Print JSON without a logo.
+.SH ENVIRONMENT
+.TP
+.B NO_COLOR
+Disable colors when set to a non-empty value.
+.SH LICENSE
+MIT

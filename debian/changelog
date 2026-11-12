@@ -1,3 +1,13 @@
+nullfetch (1.2.0) unstable; urgency=medium
+
+  * Show text next to the logo.
+  * Color the logo with the distribution color.
+  * Add uptime, shell, desktop, disk and package count.
+  * Add --only, --json and --no-color options.
+  * Add man page and test suite.
+
+ -- pybindi <sungunboom@gmail.com>  Thu, 12 Nov 2026 10:00:00 +0000
+
 nullfetch (1.1.0) unstable; urgency=medium
 
   * Add --version and --no-logo options.

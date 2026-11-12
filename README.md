@@ -17,14 +17,17 @@
 
 ## ✨ Features
 
-- 👤 current user and hostname
-- 🐧 Linux distribution and kernel version
-- 🖥️ CPU model and GPU
-- 🧠 RAM usage
-- ⌨️ terminal type
-- 🎨 ASCII logo with bold labels
-- ❓ `--help` and `--version`
+- 👤 user and hostname
+- 🐧 distribution, kernel, uptime
+- ⌨️ shell, desktop environment, terminal
+- 🖥️ CPU and GPU
+- 🧠 RAM and disk usage
+- 📦 installed package count
+- 🎨 logo colored with your distro's color (truecolor, 256-color fallback)
+- 🧩 text next to the logo, like a real fetch
 - 🙈 `--no-logo` for a text-only output
+- 🎯 `--only` to pick fields
+- 🤖 `--json` for scripts
 - 📦 standard library only — nothing to install
 
 ## 📥 Installation
@@ -34,20 +37,25 @@
 ```bash
 git clone https://github.com/pybindi/nullfetch.git
 cd nullfetch
+./install.sh
+```
 
+`install.sh` puts the script into `~/.local/bin`. To use another prefix:
+
+```bash
+PREFIX=/usr/local sudo ./install.sh
+```
+
+Manual install, if you prefer:
+
+```bash
 chmod +x nullfetch.py
 ln -s "$PWD/nullfetch.py" ~/.local/bin/nullfetch
 ```
 
-Make sure `~/.local/bin` is in your `PATH`:
-
-```bash
-echo "$PATH" | grep -q "$HOME/.local/bin" && echo OK
-```
-
 ### Arch Linux
 
-A `PKGBUILD` is included, so you can build and install the package with `pacman`:
+A `PKGBUILD` is included:
 
 ```bash
 git clone https://github.com/pybindi/nullfetch.git
@@ -60,21 +68,27 @@ for GPU detection.
 
 ### Debian / Ubuntu
 
-Debian packaging lives in `debian/`:
+A prebuilt `.deb` is attached to every release:
 
 ```bash
-sudo apt install debhelper devscripts
-dpkg-buildpackage -us -uc -b
-sudo apt install ../nullfetch_1.1.0_all.deb
+sudo apt install ./nullfetch_1.2.0_all.deb
 ```
 
-A prebuilt `.deb` is attached to every release.
+Or build it from source:
+
+```bash
+sudo apt install dpkg-dev
+./scripts/build-deb.sh
+sudo apt install ./dist/nullfetch_1.2.0_all.deb
+```
 
 ## 🚀 Usage
 
 ```bash
-nullfetch            # logo + system info
-nullfetch --no-logo  # text only
+nullfetch                 # logo + system info
+nullfetch --only cpu,ram  # just two lines
+nullfetch --no-logo       # text only
+nullfetch --json          # machine-readable output
 ```
 
 ### Options
@@ -84,48 +98,78 @@ nullfetch --no-logo  # text only
 | `-h`, `--help` | Show help and exit |
 | `--version` | Show version and exit |
 | `--no-logo` | Hide the ASCII logo |
+| `--no-color` | Disable colors (also honors `NO_COLOR`) |
+| `-o`, `--only FIELDS` | Show only the listed fields |
+| `--json` | Print system info as JSON |
+
+### Fields
+
+```text
+user host os kernel uptime shell terminal de cpu gpu ram disk packages
+```
 
 ## 🖼 Example output
 
 ```text
---------------------------
-        .--.
-       |o_o |
-       |:_/ |
-      //   \ \
-     (|     | )
-    /'\_   _/`\
-    \___)=(___/
+        .--.       USER: matuha
+       |o_o |      HOST: void
+       |:_/ |      OS: Void Linux
+      //   \ \     kernel: 6.18.60_1
+     (|     | )    uptime: 2d 3h 14m
+    /'\_   _/`\    shell: bash
+    \___)=(___/    terminal: xterm-256color
+                   DE: sway
+                   CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
+                   GPU: Intel Corporation Haswell-ULT Integrated Graphics Controller
+                   RAM: 3 / 7 GB
+                   disk: 31 / 237 GB
+                   packages: 779
+```
 
-USER: matuha
-HOST: void
-OS: Void Linux
-kernel: 6.18.60_1
-terminal: xterm-256color
-CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
-GPU: Intel Corporation Haswell-ULT Integrated Graphics Controller
-RAM: 3 / 7 GB
---------------------------
+## 🤖 JSON output
+
+```bash
+nullfetch --json
+```
+
+```json
+{
+  "user": "matuha",
+  "host": "void",
+  "os": "Void Linux",
+  "kernel": "6.18.60_1",
+  "uptime": "2d 3h 14m",
+  "shell": "bash",
+  "terminal": "xterm-256color",
+  "de": "sway",
+  "cpu": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz",
+  "gpu": "Intel Corporation Haswell-ULT Integrated Graphics Controller",
+  "ram": "3 / 7 GB",
+  "disk": "31 / 237 GB",
+  "packages": "779"
+}
 ```
 
 ## 🎨 Custom logo
 
 [`logos.py`](logos.py) collects a set of ASCII art. Pick one and paste it into
-`printlogo()`:
+the `ART` string in `nullfetch.py`:
 
 ```python
-def printlogo():
-    print(r"""        .--.
+ART = r"""        .--.
        |o_o |
        |:_/ |
       //   \ \
      (|     | )
     /'\_   _/`\
-    \___)=(___/""")
+    \___)=(___/"""
 ```
 
 > `r"""..."""` is a raw multi-line string, so backslashes in the art do not
 > need to be escaped.
+
+The logo is colored with the color of your distribution. Add new colors in
+`DISTRO_COLORS`.
 
 ## 🗂 Project structure
 
@@ -133,13 +177,20 @@ def printlogo():
 nullfetch/
 ├── nullfetch.py        # the fetch itself
 ├── logos.py            # ASCII art collection
+├── nullfetch.1         # man page
+├── install.sh          # installer for ~/.local
 ├── assets/
 │   ├── banner.png      # README header
 │   ├── demo.gif        # animated preview
 │   └── demo.svg        # static preview
-├── debian/             # Debian packaging
+├── scripts/
+│   └── build-deb.sh    # builds dist/*.deb
+├── tests/
+│   └── test_cli.py     # pytest suite
+├── debian/             # Debian packaging metadata
 ├── PKGBUILD            # Arch Linux package
-├── .github/workflows/  # syntax check on push
+├── .github/workflows/  # tests + .deb on release
+├── CONTRIBUTING.md
 ├── LICENSE
 └── README.md
 ```
@@ -148,6 +199,15 @@ nullfetch/
 
 - Python **3.10+**
 - Linux (`platform.freedesktop_os_release`)
+- optional: `pciutils` for GPU detection
+
+## 🤝 Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Tests are run with:
+
+```bash
+python -m pytest -q
+```
 
 ## 📄 License
 

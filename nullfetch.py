@@ -1,104 +1,436 @@
 #!/usr/bin/env python3
-import platform
+"""nullfetch - a tiny system fetch for Linux."""
+
 import getpass
-import sys
+import json
 import os
+import platform
+import shutil
 import subprocess
+import sys
+from itertools import zip_longest
+from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
-HELP = """nullfetch - PC info
+BOLD = "\033[1m"
+RESET = "\033[0m"
 
-Usage:
-  nullfetch [options]
+FIELDS = [
+    "user",
+    "host",
+    "os",
+    "kernel",
+    "uptime",
+    "shell",
+    "terminal",
+    "de",
+    "cpu",
+    "gpu",
+    "ram",
+    "disk",
+    "packages",
+]
 
-Options:
-  -h, --help      show this help
-      --version   show version
-      --no-logo   hide the ASCII logo
-"""
+LABELS = {
+    "user": "USER",
+    "host": "HOST",
+    "os": "OS",
+    "kernel": "kernel",
+    "uptime": "uptime",
+    "shell": "shell",
+    "terminal": "terminal",
+    "de": "DE",
+    "cpu": "CPU",
+    "gpu": "GPU",
+    "ram": "RAM",
+    "disk": "disk",
+    "packages": "packages",
+}
 
-if "--help" in sys.argv or "-h" in sys.argv:
-    print(HELP)
-    sys.exit()
+DISTRO_COLORS = {
+    "void": (71, 128, 97),
+    "arch": (23, 147, 209),
+    "debian": (215, 10, 83),
+    "ubuntu": (233, 84, 32),
+    "fedora": (41, 65, 122),
+    "opensuse": (115, 186, 37),
+    "alpine": (13, 89, 123),
+    "gentoo": (84, 64, 125),
+    "nixos": (82, 119, 183),
+    "manjaro": (53, 191, 96),
+    "mint": (134, 190, 50),
+    "kali": (38, 87, 173),
+    "raspbian": (190, 26, 66),
+    "pop": (72, 185, 199),
+}
 
-if "--version" in sys.argv:
-    print(f"nullfetch {VERSION}")
-    sys.exit()
+DEFAULT_COLOR = (88, 166, 255)
 
-no_logo = "--no-logo" in sys.argv
-
-#pcinfo:
-user = getpass.getuser()
-host = platform.node()
-distro = platform.freedesktop_os_release()["PRETTY_NAME"]
-kernel = platform.release()
-term = os.environ.get("TERM", "?")
-
-cpu = "?"
-with open("/proc/cpuinfo") as f:
-    for line in f:
-        if line.startswith("model name"):
-            cpu = line.split(":", 1)[1].strip()
-            break
-
-with open("/proc/meminfo") as f:
-    mem = {}
-    for line in f:
-        key, value = line.split(":", 1)
-        mem[key] = value.strip()
-
-ram_total = int(mem["MemTotal"].split()[0]) // 1024 // 1024
-ram_free = int(mem["MemAvailable"].split()[0]) // 1024 // 1024
-ram = f"{ram_total - ram_free} / {ram_total} GB"
-
-gpu = "?"
-try:
-    out = subprocess.run(["lspci"], capture_output=True, text=True).stdout
-    for line in out.splitlines():
-        if "VGA compatible controller" in line or "3D controller" in line:
-            gpu = line.split(": ", 1)[1].split(" (rev")[0]
-            break
-except FileNotFoundError:
-    pass
-
-
-def printlogo():
-    print(r"""        .--.
+ART = r"""        .--.
        |o_o |
        |:_/ |
       //   \ \
      (|     | )
     /'\_   _/`\
-    \___)=(___/""")
+    \___)=(___/"""
+
+HELP = f"""nullfetch {VERSION} - PC info
+
+Usage:
+  nullfetch [options]
+
+Options:
+  -h, --help          show this help
+      --version       show version
+      --no-logo       hide the ASCII logo
+      --no-color      disable colors
+  -o, --only FIELDS   show only these fields, comma separated
+      --json          print system info as JSON
+
+Fields:
+  {" ".join(FIELDS)}
+
+Examples:
+  nullfetch --only cpu,ram
+  nullfetch --no-logo --json
+"""
 
 
-def show(label, value):
-    print(f"\033[1m{label}:\033[0m {value}")
+# --- reading system information -------------------------------------------
 
-def pcinfo():
-    show("USER",user)
-    show("HOST",host)
-    show("OS", distro)
-    show("kernel", kernel)
-    show("terminal", term)
-    show("CPU", cpu)
-    show("GPU", gpu)
-    show("RAM", ram)
 
-#line1
-print("--------------------------")
+def read(path):
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
 
-#pictureprint:
-if not no_logo:
-    printlogo()
 
-#space
-if not no_logo:
-    print("                   ")
+def os_release():
+    try:
+        return platform.freedesktop_os_release()
+    except OSError:
+        return {}
 
-#pcinfoprint:
-pcinfo()
 
-#line2
-print("--------------------------")
+def get_user():
+    try:
+        return getpass.getuser()
+    except (KeyError, OSError):
+        return os.environ.get("USER", "?")
+
+
+def get_host():
+    return platform.node() or "?"
+
+
+def get_os():
+    release = os_release()
+    return release.get("PRETTY_NAME") or release.get("NAME") or "Linux"
+
+
+def get_kernel():
+    return platform.release()
+
+
+def get_uptime():
+    try:
+        seconds = int(float(read("/proc/uptime").split()[0]))
+    except (IndexError, ValueError):
+        return "?"
+
+    days, rest = divmod(seconds, 86400)
+    hours, rest = divmod(rest, 3600)
+    minutes = rest // 60
+
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    parts.append(f"{minutes}m")
+    return " ".join(parts)
+
+
+def get_shell():
+    return os.path.basename(os.environ.get("SHELL", "")) or "?"
+
+
+def get_terminal():
+    return os.environ.get("TERM", "?")
+
+
+def get_de():
+    return (
+        os.environ.get("XDG_CURRENT_DESKTOP")
+        or os.environ.get("DESKTOP_SESSION")
+        or "?"
+    )
+
+
+def get_cpu():
+    for line in read("/proc/cpuinfo").splitlines():
+        if line.startswith("model name"):
+            return line.split(":", 1)[1].strip()
+    return "?"
+
+
+def get_gpu():
+    if not shutil.which("lspci"):
+        return "?"
+    try:
+        out = subprocess.run(
+            ["lspci"], capture_output=True, text=True, timeout=5
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return "?"
+    for line in out.splitlines():
+        if "VGA compatible controller" in line or "3D controller" in line:
+            return line.split(": ", 1)[1].split(" (rev")[0]
+    return "?"
+
+
+def get_ram():
+    info = {}
+    for line in read("/proc/meminfo").splitlines():
+        if ":" in line:
+            key, value = line.split(":", 1)
+            info[key] = value.split()
+
+    total_kb = int(info.get("MemTotal", [0])[0])
+    available_kb = int(info.get("MemAvailable", info.get("MemFree", [0]))[0])
+    if not total_kb:
+        return "?"
+
+    total = total_kb // 1024 // 1024
+    used = (total_kb - available_kb) // 1024 // 1024
+    return f"{used} / {total} GB"
+
+
+def get_disk():
+    try:
+        st = os.statvfs("/")
+    except OSError:
+        return "?"
+
+    gb = 1024 ** 3
+    total = st.f_blocks * st.f_frsize
+    free = st.f_bavail * st.f_frsize
+    return f"{(total - free) // gb} / {total // gb} GB"
+
+
+PACKAGE_COMMANDS = {
+    "void": ["xbps-query", "-l"],
+    "debian": ["dpkg-query", "-f", ".\\n", "-W"],
+    "ubuntu": ["dpkg-query", "-f", ".\\n", "-W"],
+    "arch": ["pacman", "-Q"],
+    "manjaro": ["pacman", "-Q"],
+    "endeavouros": ["pacman", "-Q"],
+    "fedora": ["rpm", "-qa"],
+    "opensuse": ["rpm", "-qa"],
+    "alpine": ["apk", "info"],
+    "gentoo": ["qlist", "-I"],
+}
+
+
+def get_packages():
+    release = os_release()
+    names = [release.get("ID", "").lower()]
+    names += release.get("ID_LIKE", "").lower().split()
+
+    for name in names:
+        command = PACKAGE_COMMANDS.get(name)
+        if command and shutil.which(command[0]):
+            try:
+                out = subprocess.run(
+                    command, capture_output=True, text=True, timeout=5
+                ).stdout
+            except (OSError, subprocess.SubprocessError):
+                return "?"
+            return str(len([line for line in out.splitlines() if line.strip()]))
+    return "?"
+
+
+GETTERS = {
+    "user": get_user,
+    "host": get_host,
+    "os": get_os,
+    "kernel": get_kernel,
+    "uptime": get_uptime,
+    "shell": get_shell,
+    "terminal": get_terminal,
+    "de": get_de,
+    "cpu": get_cpu,
+    "gpu": get_gpu,
+    "ram": get_ram,
+    "disk": get_disk,
+    "packages": get_packages,
+}
+
+
+def collect(fields):
+    data = {}
+    for key in fields:
+        try:
+            data[key] = GETTERS[key]()
+        except Exception:
+            data[key] = "?"
+    return data
+
+
+# --- colors ---------------------------------------------------------------
+
+
+def color_enabled():
+    return not os.environ.get("NO_COLOR")
+
+
+def rgb_to_256(r, g, b):
+    if r == g == b:
+        if r < 8:
+            return 16
+        if r > 248:
+            return 231
+        return 232 + round((r - 8) / 247 * 24)
+    return 16 + 36 * round(r / 255 * 5) + 6 * round(g / 255 * 5) + round(b / 255 * 5)
+
+
+def distro_color():
+    release = os_release()
+    names = [release.get("ID", "").lower()]
+    names += release.get("ID_LIKE", "").lower().split()
+
+    for name in names:
+        if name in DISTRO_COLORS:
+            return DISTRO_COLORS[name]
+    return DEFAULT_COLOR
+
+
+def fg(rgb):
+    r, g, b = rgb
+    if os.environ.get("COLORTERM", "").lower() in ("truecolor", "24bit"):
+        return f"\033[38;2;{r};{g};{b}m"
+    return f"\033[38;5;{rgb_to_256(r, g, b)}m"
+
+
+# --- output ---------------------------------------------------------------
+
+
+def info_lines(data, use_color):
+    lines = []
+    for key, value in data.items():
+        label = LABELS[key]
+        if use_color:
+            lines.append(f"{BOLD}{label}:{RESET} {value}")
+        else:
+            lines.append(f"{label}: {value}")
+    return lines
+
+
+def render(data, show_logo, use_color):
+    lines = info_lines(data, use_color)
+    if not show_logo:
+        return "\n".join(lines)
+
+    art = ART.splitlines()
+    width = max(len(line) for line in art) + 4
+
+    if use_color:
+        prefix = fg(distro_color())
+        art = [prefix + line.ljust(width) + RESET for line in art]
+    else:
+        art = [line.ljust(width) for line in art]
+
+    rows = []
+    for left, right in zip_longest(art, lines, fillvalue=""):
+        if not left:
+            left = " " * width
+        rows.append((left + right).rstrip())
+    return "\n".join(rows)
+
+
+# --- command line ---------------------------------------------------------
+
+
+def fail(message):
+    print(f"nullfetch: {message}", file=sys.stderr)
+    print("try 'nullfetch --help'", file=sys.stderr)
+    sys.exit(2)
+
+
+def parse_args(argv):
+    opts = {
+        "help": False,
+        "version": False,
+        "logo": True,
+        "color": color_enabled(),
+        "json": False,
+        "only": None,
+    }
+
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+
+        if arg in ("-h", "--help"):
+            opts["help"] = True
+        elif arg == "--version":
+            opts["version"] = True
+        elif arg == "--no-logo":
+            opts["logo"] = False
+        elif arg == "--no-color":
+            opts["color"] = False
+        elif arg == "--json":
+            opts["json"] = True
+        elif arg in ("-o", "--only"):
+            i += 1
+            if i == len(argv):
+                fail(f"{arg} needs a value")
+            opts["only"] = argv[i]
+        elif arg.startswith("--only="):
+            opts["only"] = arg.split("=", 1)[1]
+        else:
+            fail(f"unknown option: {arg}")
+
+        i += 1
+
+    return opts
+
+
+def main(argv):
+    opts = parse_args(argv)
+
+    if opts["help"]:
+        print(HELP)
+        return 0
+
+    if opts["version"]:
+        print(f"nullfetch {VERSION}")
+        return 0
+
+    fields = FIELDS
+    if opts["only"] is not None:
+        fields = [name.strip().lower() for name in opts["only"].split(",")]
+        fields = [name for name in fields if name]
+        if not fields:
+            fail("--only needs at least one field")
+        unknown = [name for name in fields if name not in FIELDS]
+        if unknown:
+            fail(f"unknown field: {', '.join(unknown)}")
+
+    data = collect(fields)
+
+    if opts["json"]:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+        return 0
+
+    print(render(data, opts["logo"], opts["color"]))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except BrokenPipeError:
+        sys.exit(0)
