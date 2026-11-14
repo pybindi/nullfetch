@@ -286,6 +286,27 @@ def test_logo_file_limits(tmp_path):
     assert "too large" in result.stderr
 
 
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [("x\n" * 101, "too many lines"), ("x" * 2001, "overlong line"), ("", "empty")],
+)
+def test_logo_file_other_limits(tmp_path, content, message):
+    path = tmp_path / "invalid-art.txt"
+    path.write_text(content)
+    result = run("--logo-file", str(path))
+    assert result.returncode == 2
+    assert message in result.stderr
+
+
+def test_gpu_sysfs_fallback(monkeypatch, tmp_path):
+    card = tmp_path / "card0" / "device"
+    card.mkdir(parents=True)
+    (card / "uevent").write_text("DRIVER=mockgpu\n")
+    monkeypatch.setattr(nullfetch.shutil, "which", lambda name: None)
+    monkeypatch.setattr(nullfetch.Path, "glob", lambda self, pattern: [card])
+    assert nullfetch.get_gpu() == "mockgpu"
+
+
 def test_distro_logos_present():
     for name in ("fedora", "opensuse", "alpine", "nixos", "gentoo", "mint"):
         assert name in nullfetch.LOGOS
@@ -302,6 +323,11 @@ def test_distro_logos_present():
         ["--ascii", "--no-color"],
         ["--width", "60"],
         ["--accent", "#00ff00"],
+        ["--accent=#00ff00", "--color=never"],
+        ["--theme=mono"],
+        ["--theme=neon", "--color", "always"],
+        ["--compact"],
+        ["--list-logos"],
         ["--only", "user"],
         ["--logo", "cat", "--no-color"],
         ["--logo", "arch", "--no-color"],
