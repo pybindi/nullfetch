@@ -29,6 +29,9 @@
 - 📏 `--width N` and `--oneline` for scripts and status bars
 - 🎛 `--accent COLOR` and `--logo-file FILE`
 - 📋 `--list-logos` to show all built-in logo names
+- 🎨 `--theme` with `default`, `mono` and bright `neon` styles
+- 🌈 smart colors with `--color auto|always|never`
+- 📐 `--compact` for a tighter visual layout
 - 🙈 `--no-logo` for a text-only output
 - 🎯 `--only` to pick fields
 - 🤖 `--json` for scripts
@@ -82,7 +85,7 @@ for GPU detection.
 A prebuilt `.deb` is attached to every release:
 
 ```bash
-sudo apt install ./nullfetch_1.6.0_all.deb
+sudo apt install ./nullfetch_1.7.0_all.deb
 ```
 
 Or build it from source:
@@ -90,7 +93,7 @@ Or build it from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_1.6.0_all.deb
+sudo apt install ./dist/nullfetch_1.7.0_all.deb
 ```
 
 Each release also includes `SHA256SUMS` for verifying the downloaded package:
@@ -109,6 +112,8 @@ nullfetch --json             # machine-readable output
 nullfetch --oneline          # one line for a status bar
 nullfetch --ascii            # no block characters
 nullfetch --accent '#ff0000' # red logo
+nullfetch --theme neon        # bright pink accent
+nullfetch --compact           # tighter layout
 ```
 
 ### Options
@@ -121,6 +126,9 @@ nullfetch --accent '#ff0000' # red logo
 | `--logo NAME` | Logo to show: `auto`, `none`, or a name from `logos.py` |
 | `--logo-file FILE` | Use a custom ASCII art file |
 | `--accent COLOR` | Accent color in `#rrggbb` |
+| `--color MODE` | `auto`, `always` or `never` |
+| `--theme NAME` | `default`, `mono` or `neon` |
+| `--compact` | Tighter output for small terminals |
 | `--no-color` | Disable colors (also honors `NO_COLOR`) |
 | `--ascii` | ASCII-only bars, ellipsis and separators |
 | `--width N` | Output width in columns |
@@ -165,6 +173,9 @@ source scripts/completions/_nullfetch
 # fish
 source scripts/completions/nullfetch.fish
 ```
+
+Colors automatically turn off when output is redirected. Use
+`--color always` to force them or `--color never` to disable them.
 
 ## ⚡ Speed
 

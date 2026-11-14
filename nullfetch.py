@@ -12,7 +12,7 @@ import sys
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -112,7 +112,10 @@ Options:
                       {LOGO_NAMES}
       --logo-file F   use a custom ASCII art file
       --accent COLOR  accent color, e.g. #ff0000
-      --no-color      disable colors
+      --color MODE    color mode: auto, always, or never
+      --no-color      alias for --color never
+      --theme NAME    theme: default, mono, or neon
+      --compact       tighter visual layout
       --ascii         ASCII-only bars and ellipsis
       --width N       output width in columns
       --oneline       one compact line for status bars
@@ -176,20 +179,27 @@ def get_cpu():
 
 
 def get_gpu():
-    if not shutil.which("lspci"):
-        return "?"
-    try:
-        out = subprocess.run(
-            ["lspci"], capture_output=True, text=True, timeout=5
-        ).stdout
-    except (OSError, subprocess.SubprocessError):
-        return "?"
     names = []
-    for line in out.splitlines():
-        if "VGA compatible controller" in line or "3D controller" in line:
-            name = line.split(": ", 1)[-1].split(" (rev")[0]
-            if name not in names:
-                names.append(name)
+    if shutil.which("lspci"):
+        try:
+            out = subprocess.run(
+                ["lspci"], capture_output=True, text=True, timeout=5
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            out = ""
+        for line in out.splitlines():
+            if "VGA compatible controller" in line or "3D controller" in line:
+                name = line.split(": ", 1)[-1].split(" (rev")[0]
+                if name not in names:
+                    names.append(name)
+    if not names:
+        for path in sorted(Path("/sys/class/drm").glob("card*/device")):
+            for line in read(path / "uevent").splitlines():
+                if line.startswith("DRIVER="):
+                    driver = line.split("=", 1)[1]
+                    if driver not in names:
+                        names.append(driver)
+                    break
     return ", ".join(names) or "?"
 
 
@@ -253,7 +263,7 @@ def collect(fields):
 
 
 def color_enabled():
-    return not os.environ.get("NO_COLOR")
+    return bool(sys.stdout.isatty()) and not os.environ.get("NO_COLOR")
 
 
 def rgb_to_256(r, g, b):
@@ -373,7 +383,9 @@ def paint_art(art, use_color, width=0, accent=None, max_width=None):
     return lines
 
 
-def render(data, art, use_color, width=None, accent=None, ascii_mode=False):
+def render(
+    data, art, use_color, width=None, accent=None, ascii_mode=False, compact=False
+):
     if width is None:
         width = shutil.get_terminal_size((80, 24)).columns
 
@@ -384,8 +396,11 @@ def render(data, art, use_color, width=None, accent=None, ascii_mode=False):
 
     if width < art_width + 40:
         lines = info_lines(data, use_color, width, accent, ascii_mode)
+        separator = [] if compact or ascii_mode else [""]
         return "\n".join(
-            paint_art(art, use_color, accent=accent, max_width=width) + [""] + lines
+            paint_art(art, use_color, accent=accent, max_width=width)
+            + separator
+            + lines
         )
 
     lines = info_lines(data, use_color, width - art_width, accent, ascii_mode)
@@ -436,7 +451,13 @@ def read_logo_file(path):
     except OSError:
         fail(f"cannot read logo file: {path}")
 
+    if len(text) > 100_000:
+        fail("logo file is too large (maximum: 100 KiB)")
     lines = text.rstrip("\n").splitlines()
+    if len(lines) > 100:
+        fail("logo file has too many lines (maximum: 100)")
+    if any(len(line) > 2_000 for line in lines):
+        fail("logo file has an overlong line (maximum: 2000 characters)")
     if not lines:
         fail(f"logo file is empty: {path}")
     return lines
@@ -470,6 +491,9 @@ def parse_args(argv):
         "logo_file": None,
         "accent": None,
         "color": color_enabled(),
+        "color_mode": "auto",
+        "theme": "default",
+        "compact": False,
         "ascii": False,
         "width": None,
         "oneline": False,
@@ -520,10 +544,39 @@ def parse_args(argv):
             opts["width"] = parse_width(arg.split("=", 1)[1])
         elif arg == "--oneline":
             opts["oneline"] = True
+        elif arg == "--compact":
+            opts["compact"] = True
         elif arg == "--list-logos":
             opts["list_logos"] = True
         elif arg == "--no-color":
             opts["color"] = False
+            opts["color_mode"] = "never"
+        elif arg == "--color":
+            i += 1
+            if i == len(argv):
+                fail(f"{arg} needs a value")
+            mode = argv[i]
+            if mode not in ("auto", "always", "never"):
+                fail(f"invalid color mode: {mode}")
+            opts["color_mode"] = mode
+            opts["color"] = mode == "always" or (
+                mode == "auto" and color_enabled()
+            )
+        elif arg.startswith("--color="):
+            mode = arg.split("=", 1)[1]
+            if mode not in ("auto", "always", "never"):
+                fail(f"invalid color mode: {mode}")
+            opts["color_mode"] = mode
+            opts["color"] = mode == "always" or (
+                mode == "auto" and color_enabled()
+            )
+        elif arg == "--theme":
+            i += 1
+            if i == len(argv):
+                fail(f"{arg} needs a value")
+            opts["theme"] = argv[i]
+        elif arg.startswith("--theme="):
+            opts["theme"] = arg.split("=", 1)[1]
         elif arg == "--json":
             opts["json"] = True
         elif arg in ("-o", "--only"):
@@ -546,6 +599,9 @@ def main(argv=None):
         argv = sys.argv[1:]
 
     opts = parse_args(argv)
+
+    if opts["theme"] not in ("default", "mono", "neon"):
+        fail(f"unknown theme: {opts['theme']} (use default, mono, or neon)")
 
     if opts["help"]:
         print(HELP)
@@ -582,6 +638,10 @@ def main(argv=None):
         return 0
 
     accent = parse_color(opts["accent"]) if opts["accent"] else None
+    if opts["theme"] == "mono":
+        opts["color"] = False
+    elif opts["theme"] == "neon" and accent is None:
+        accent = (255, 80, 220)
 
     if not opts["logo"]:
         art = []
@@ -595,9 +655,10 @@ def main(argv=None):
             data,
             art,
             opts["color"],
-            width=opts["width"],
+            width=opts["width"] or (60 if opts["compact"] else None),
             accent=accent,
             ascii_mode=opts["ascii"],
+            compact=opts["compact"],
         )
     )
     return 0

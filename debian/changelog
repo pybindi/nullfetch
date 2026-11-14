@@ -1,3 +1,11 @@
+nullfetch (1.7.0) unstable; urgency=medium
+
+  * Add automatic color modes and default, mono and neon themes.
+  * Add compact output and safer custom logo file limits.
+  * Detect GPUs through sysfs when lspci is unavailable.
+
+ -- pybindi <sungunboom@gmail.com>  Sat, 14 Nov 2026 14:30:00 +0000
+
 nullfetch (1.6.0) unstable; urgency=medium
 
   * Show RAM and disk values with one decimal place.

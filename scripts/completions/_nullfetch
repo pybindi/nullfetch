@@ -8,6 +8,9 @@ _nullfetch() {
         '--logo[logo to show]:logo:(auto none alpine arch cactus cat coffee computer cow debian fedora frog gentoo ghost linux mint moon nixos opensuse penguin robot rocket skull tree ubuntu void)' \
         '--logo-file[custom ASCII art file]:file:_files' \
         '--accent[accent color]:color:' \
+        '--color[color mode]:mode:(auto always never)' \
+        '--theme[visual theme]:theme:(default mono neon)' \
+        '--compact[tighter visual layout]' \
         '--no-color[disable colors]' \
         '--ascii[ASCII-only output]' \
         '--width[output width]:columns:' \

@@ -80,9 +80,38 @@ def test_no_color():
     assert "\033" not in out
 
 
+def test_color_modes():
+    assert "\033[" in run("--color", "always").stdout
+    assert "\033[" not in run("--color", "never").stdout
+
+
+def test_color_mode_invalid():
+    result = run("--color", "loud")
+    assert result.returncode == 2
+    assert "invalid color mode" in result.stderr
+
+
+def test_themes():
+    assert "\033[" not in run("--theme", "mono").stdout
+    assert "38;2;255;80;220" in run(
+        "--theme", "neon", "--color", "always"
+    ).stdout
+
+
+def test_theme_invalid():
+    result = run("--theme", "sunset")
+    assert result.returncode == 2
+    assert "unknown theme" in result.stderr
+
+
+def test_compact_output():
+    out = run("--compact", "--no-color").stdout
+    assert "\n\n" not in out
+
+
 def test_color_by_default():
     out = run().stdout
-    assert "\033[" in out
+    assert "\033[" not in out
 
 
 def test_json():
@@ -224,7 +253,9 @@ def test_list_logos():
 
 
 def test_accent():
-    out = run("--accent", "#ff0000", "--logo", "linux").stdout
+    out = run(
+        "--accent", "#ff0000", "--logo", "linux", "--color", "always"
+    ).stdout
     assert "38;2;255;0;0" in out
 
 
@@ -245,6 +276,14 @@ def test_logo_file_missing():
     result = run("--logo-file", "/nonexistent/art.txt")
     assert result.returncode == 2
     assert "cannot read" in result.stderr
+
+
+def test_logo_file_limits(tmp_path):
+    path = tmp_path / "huge.txt"
+    path.write_text("x" * 100_001)
+    result = run("--logo-file", str(path))
+    assert result.returncode == 2
+    assert "too large" in result.stderr
 
 
 def test_distro_logos_present():

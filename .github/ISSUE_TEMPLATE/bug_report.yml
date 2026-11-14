@@ -15,7 +15,7 @@ body:
     attributes:
       label: nullfetch version
       description: Output of `nullfetch --version`.
-      placeholder: nullfetch 1.6.0
+      placeholder: nullfetch 1.7.0
     validations:
       required: true
 

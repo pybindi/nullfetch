@@ -16,13 +16,23 @@ _nullfetch() {
         COMPREPLY=($(compgen -f -- "$cur"))
         return
         ;;
+    --accent | --width | --color | --theme)
+        if [ "$prev" = "--color" ]; then
+            COMPREPLY=($(compgen -W "auto always never" -- "$cur"))
+        elif [ "$prev" = "--theme" ]; then
+            COMPREPLY=($(compgen -W "default mono neon" -- "$cur"))
+        else
+            COMPREPLY=()
+        fi
+        return
+        ;;
     --accent | --width)
         COMPREPLY=()
         return
         ;;
     esac
 
-    COMPREPLY=($(compgen -W "--help --version --no-logo --logo --logo-file --accent --no-color --ascii --width --oneline --list-logos --only --json" -- "$cur"))
+    COMPREPLY=($(compgen -W "--help --version --no-logo --logo --logo-file --accent --color --theme --compact --no-color --ascii --width --oneline --list-logos --only --json" -- "$cur"))
 }
 
 complete -F _nullfetch nullfetch
