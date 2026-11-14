@@ -6,7 +6,13 @@ _nullfetch() {
         '--version[show version]' \
         '--no-logo[hide the ASCII logo]' \
         '--logo[logo to show]:logo:(auto none alpine arch cactus cat coffee computer cow debian fedora frog gentoo ghost linux mint moon nixos opensuse penguin robot rocket skull tree ubuntu void)' \
+        '--logo-file[custom ASCII art file]:file:_files' \
+        '--accent[accent color]:color:' \
         '--no-color[disable colors]' \
+        '--ascii[ASCII-only output]' \
+        '--width[output width]:columns:' \
+        '--oneline[one compact line]' \
+        '--list-logos[list available logos]' \
         '(-o --only)'{-o,--only}'[show only these fields]:fields:(user host os kernel cpu gpu ram disk)' \
         '--json[print system info as JSON]'
 }

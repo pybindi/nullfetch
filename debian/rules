@@ -9,6 +9,9 @@ override_dh_auto_build:
 override_dh_auto_install:
 	install -Dm755 nullfetch.py debian/nullfetch/usr/bin/nullfetch
 	install -Dm644 logos.py debian/nullfetch/usr/share/nullfetch/logos.py
+	install -Dm644 scripts/completions/nullfetch.bash debian/nullfetch/usr/share/bash-completion/completions/nullfetch
+	install -Dm644 scripts/completions/_nullfetch debian/nullfetch/usr/share/zsh/site-functions/_nullfetch
+	install -Dm644 scripts/completions/nullfetch.fish debian/nullfetch/usr/share/fish/vendor_completions.d/nullfetch.fish
 	install -Dm644 README.md debian/nullfetch/usr/share/doc/nullfetch/README.md
 	install -Dm644 nullfetch.1 debian/nullfetch/usr/share/man/man1/nullfetch.1
 

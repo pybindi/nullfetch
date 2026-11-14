@@ -12,7 +12,7 @@ import sys
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -116,6 +116,7 @@ Options:
       --ascii         ASCII-only bars and ellipsis
       --width N       output width in columns
       --oneline       one compact line for status bars
+      --list-logos    list available logo names
   -o, --only FIELDS   show only these fields, comma separated
       --json          print system info as JSON
 
@@ -183,10 +184,13 @@ def get_gpu():
         ).stdout
     except (OSError, subprocess.SubprocessError):
         return "?"
+    names = []
     for line in out.splitlines():
         if "VGA compatible controller" in line or "3D controller" in line:
-            return line.split(": ", 1)[1].split(" (rev")[0]
-    return "?"
+            name = line.split(": ", 1)[-1].split(" (rev")[0]
+            if name not in names:
+                names.append(name)
+    return ", ".join(names) or "?"
 
 
 def size_value(used, total):
@@ -206,8 +210,8 @@ def get_ram():
     if not total_kb:
         return "?"
 
-    total = total_kb // 1024 // 1024
-    used = (total_kb - available_kb) // 1024 // 1024
+    total = round(total_kb / 1024 / 1024, 1)
+    used = round((total_kb - available_kb) / 1024 / 1024, 1)
     return size_value(used, total)
 
 
@@ -217,10 +221,10 @@ def get_disk():
     except OSError:
         return "?"
 
-    gb = 1024 ** 3
+    gb = 1024**3
     total = st.f_blocks * st.f_frsize
     free = st.f_bavail * st.f_frsize
-    return size_value((total - free) // gb, total // gb)
+    return size_value(round((total - free) / gb, 1), round(total / gb, 1))
 
 
 GETTERS = {
@@ -306,11 +310,17 @@ def logo_lines(name):
 # --- output ---------------------------------------------------------------
 
 
-def format_size(value, use_color, accent=None, ascii_mode=False):
-    text = f"{value['used']} / {value['total']} GB"
+def format_size(
+    value, use_color, accent=None, ascii_mode=False, max_width=None
+):
+    text = f"{value['used']} / {value['total']} GiB"
     percent = value["percent"]
-    filled = round(percent / 100 * BAR_WIDTH)
-    empty = BAR_WIDTH - filled
+    bar_width = BAR_WIDTH
+    if max_width is not None:
+        available = max_width - len(text) - 8
+        bar_width = max(3, min(BAR_WIDTH, available))
+    filled = round(percent / 100 * bar_width)
+    empty = bar_width - filled
 
     full, blank = ("#", "-") if ascii_mode else ("█", "░")
 
@@ -319,7 +329,11 @@ def format_size(value, use_color, accent=None, ascii_mode=False):
     else:
         bar = full * filled + blank * empty
 
-    return f"{text:<14}{bar} {percent:>3}%"
+    result = f"{text:<16}{bar} {percent:>3}%"
+    if max_width is not None and len(result) > max_width:
+        compact = f"{value['used']}/{value['total']} GiB {bar} {percent}%"
+        result = compact[:max_width]
+    return result
 
 
 def info_lines(data, use_color, max_width=None, accent=None, ascii_mode=False):
@@ -328,7 +342,8 @@ def info_lines(data, use_color, max_width=None, accent=None, ascii_mode=False):
         label = LABELS[key]
 
         if isinstance(value, dict):
-            text = format_size(value, use_color, accent, ascii_mode)
+            room = max_width - len(label) - 2 if max_width else None
+            text = format_size(value, use_color, accent, ascii_mode, room)
         else:
             text = value
             if max_width:
@@ -344,12 +359,14 @@ def info_lines(data, use_color, max_width=None, accent=None, ascii_mode=False):
     return lines
 
 
-def paint_art(art, use_color, width=0, accent=None):
+def paint_art(art, use_color, width=0, accent=None, max_width=None):
     prefix = fg(accent or distro_color()) if use_color else ""
     suffix = RESET if use_color else ""
 
     lines = []
     for line in art:
+        if max_width:
+            line = line[:max_width]
         if width:
             line = line.ljust(width)
         lines.append(prefix + line + suffix)
@@ -367,7 +384,9 @@ def render(data, art, use_color, width=None, accent=None, ascii_mode=False):
 
     if width < art_width + 40:
         lines = info_lines(data, use_color, width, accent, ascii_mode)
-        return "\n".join(paint_art(art, use_color, accent=accent) + [""] + lines)
+        return "\n".join(
+            paint_art(art, use_color, accent=accent, max_width=width) + [""] + lines
+        )
 
     lines = info_lines(data, use_color, width - art_width, accent, ascii_mode)
     art = paint_art(art, use_color, art_width, accent)
@@ -387,9 +406,14 @@ def oneline(data, ascii_mode=False):
 
     for key, value in data.items():
         if key in ("user", "host"):
+            if not ("user" in data and "host" in data):
+                parts.append(str(value))
             continue
         if isinstance(value, dict):
-            parts.append(f"{value['used']}/{value['total']} GB {value['percent']}%")
+            parts.append(
+                f"{LABELS[key]} {value['used']}/{value['total']} GiB "
+                f"{value['percent']}%"
+            )
         else:
             parts.append(str(value))
 
@@ -449,6 +473,7 @@ def parse_args(argv):
         "ascii": False,
         "width": None,
         "oneline": False,
+        "list_logos": False,
         "json": False,
         "only": None,
     }
@@ -495,6 +520,8 @@ def parse_args(argv):
             opts["width"] = parse_width(arg.split("=", 1)[1])
         elif arg == "--oneline":
             opts["oneline"] = True
+        elif arg == "--list-logos":
+            opts["list_logos"] = True
         elif arg == "--no-color":
             opts["color"] = False
         elif arg == "--json":
@@ -526,6 +553,10 @@ def main(argv=None):
 
     if opts["version"]:
         print(f"nullfetch {VERSION}")
+        return 0
+
+    if opts["list_logos"]:
+        print("\n".join(sorted(LOGOS)))
         return 0
 
     fields = FIELDS

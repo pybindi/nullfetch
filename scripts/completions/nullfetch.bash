@@ -12,9 +12,17 @@ _nullfetch() {
         COMPREPLY=($(compgen -W "auto none alpine arch cactus cat coffee computer cow debian fedora frog gentoo ghost linux mint moon nixos opensuse penguin robot rocket skull tree ubuntu void" -- "$cur"))
         return
         ;;
+    --logo-file)
+        COMPREPLY=($(compgen -f -- "$cur"))
+        return
+        ;;
+    --accent | --width)
+        COMPREPLY=()
+        return
+        ;;
     esac
 
-    COMPREPLY=($(compgen -W "--help --version --no-logo --logo --no-color --only --json" -- "$cur"))
+    COMPREPLY=($(compgen -W "--help --version --no-logo --logo --logo-file --accent --no-color --ascii --width --oneline --list-logos --only --json" -- "$cur"))
 }
 
 complete -F _nullfetch nullfetch

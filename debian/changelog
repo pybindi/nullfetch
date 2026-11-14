@@ -1,3 +1,12 @@
+nullfetch (1.6.0) unstable; urgency=medium
+
+  * Show RAM and disk values with one decimal place.
+  * Detect multiple GPUs and improve narrow output.
+  * Add --list-logos and install shell completions.
+  * Publish SHA256SUMS with Debian releases.
+
+ -- pybindi <sungunboom@gmail.com>  Sat, 14 Nov 2026 12:00:00 +0000
+
 nullfetch (1.5.0) unstable; urgency=medium
 
   * Add --ascii, --width, --oneline, --accent and --logo-file.
@@ -62,3 +71,11 @@ nullfetch (1.0.0) unstable; urgency=medium
   * Initial release.
 
  -- pybindi <sungunboom@gmail.com>  Tue, 10 Nov 2026 19:30:00 +0000
+nullfetch (1.6.0) unstable; urgency=medium
+
+  * Show RAM and disk values with one decimal place.
+  * Detect multiple GPUs and improve narrow output.
+  * Add --list-logos and install shell completions.
+  * Publish SHA256SUMS with Debian releases.
+
+ -- pybindi <sungunboom@gmail.com>  Sat, 14 Nov 2026 12:00:00 +0000

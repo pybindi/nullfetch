@@ -15,10 +15,19 @@ trap 'rm -rf "$root"' EXIT
 
 pkg="$root/nullfetch"
 mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/share/doc/nullfetch" \
-    "$pkg/usr/share/nullfetch" "$pkg/usr/share/man/man1"
+    "$pkg/usr/share/nullfetch" "$pkg/usr/share/man/man1" \
+    "$pkg/usr/share/bash-completion/completions" \
+    "$pkg/usr/share/zsh/site-functions" \
+    "$pkg/usr/share/fish/vendor_completions.d"
 
 install -Dm755 nullfetch.py "$pkg/usr/bin/nullfetch"
 install -Dm644 logos.py "$pkg/usr/share/nullfetch/logos.py"
+install -Dm644 scripts/completions/nullfetch.bash \
+    "$pkg/usr/share/bash-completion/completions/nullfetch"
+install -Dm644 scripts/completions/_nullfetch \
+    "$pkg/usr/share/zsh/site-functions/_nullfetch"
+install -Dm644 scripts/completions/nullfetch.fish \
+    "$pkg/usr/share/fish/vendor_completions.d/nullfetch.fish"
 install -Dm644 README.md "$pkg/usr/share/doc/nullfetch/README.md"
 install -Dm644 debian/copyright "$pkg/usr/share/doc/nullfetch/copyright"
 gzip -9n -c nullfetch.1 >"$pkg/usr/share/man/man1/nullfetch.1.gz"
@@ -43,4 +52,5 @@ EOF
 
 mkdir -p dist
 dpkg-deb --build --root-owner-group "$pkg" "dist/nullfetch_${version}_all.deb"
+sha256sum "dist/nullfetch_${version}_all.deb" >"dist/SHA256SUMS"
 echo "dist/nullfetch_${version}_all.deb"

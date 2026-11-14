@@ -37,6 +37,7 @@ def test_help():
     assert result.returncode == 0
     assert "--no-logo" in result.stdout
     assert "--json" in result.stdout
+    assert "--list-logos" in result.stdout
 
 
 def test_unknown_option():
@@ -157,8 +158,8 @@ def test_rgb_to_256():
 
 
 def test_format_size():
-    line = nullfetch.format_size({"used": 1, "total": 4, "percent": 25}, False)
-    assert "1 / 4 GB" in line
+    line = nullfetch.format_size({"used": 1.0, "total": 4.0, "percent": 25}, False)
+    assert "1.0 / 4.0 GiB" in line
     assert "25%" in line
     assert line.count("█") + line.count("░") == nullfetch.BAR_WIDTH
 
@@ -181,6 +182,11 @@ def test_width_option():
     assert max(len(line) for line in out.splitlines()) <= 50
 
 
+def test_very_narrow_width_option():
+    out = run("--width", "20", "--no-color").stdout
+    assert max(len(line) for line in out.splitlines()) <= 20
+
+
 def test_width_invalid():
     assert run("--width", "5").returncode == 2
 
@@ -196,6 +202,25 @@ def test_oneline_ascii():
     out = run("--oneline", "--ascii", "--no-color").stdout
     assert "·" not in out
     assert " | " in out
+
+
+@pytest.mark.parametrize("field", ["user", "host"])
+def test_oneline_single_identity_field(field):
+    out = run("--oneline", "--only", field, "--no-color").stdout.strip()
+    assert out
+
+
+def test_oneline_labels_sizes():
+    out = run("--oneline", "--only", "ram,disk", "--no-color").stdout
+    assert "RAM " in out
+    assert "disk " in out
+
+
+def test_list_logos():
+    result = run("--list-logos")
+    assert result.returncode == 0
+    assert "arch" in result.stdout
+    assert "void" in result.stdout
 
 
 def test_accent():
@@ -279,6 +304,26 @@ def test_size_values():
     disk = nullfetch.get_disk()
     assert set(disk) == {"used", "total", "percent"}
     assert nullfetch.size_value(0, 0)["percent"] == 0
+
+
+def test_get_ram_uses_fractional_gib(monkeypatch):
+    meminfo = "MemTotal:       2097152 kB\nMemAvailable:   1048576 kB\n"
+    monkeypatch.setattr(nullfetch, "read", lambda path: meminfo)
+    value = nullfetch.get_ram()
+    assert value == {"used": 1.0, "total": 2.0, "percent": 50}
+
+
+def test_get_gpu_lists_multiple(monkeypatch):
+    output = """00:02.0 VGA compatible controller: Intel GPU (rev 01)
+01:00.0 3D controller: NVIDIA GPU (rev 02)
+"""
+    monkeypatch.setattr(nullfetch.shutil, "which", lambda name: "/usr/bin/lspci")
+    monkeypatch.setattr(
+        nullfetch.subprocess,
+        "run",
+        lambda *args, **kwargs: type("Result", (), {"stdout": output})(),
+    )
+    assert nullfetch.get_gpu() == "Intel GPU, NVIDIA GPU"
 
 
 def test_distro_color_and_fg():

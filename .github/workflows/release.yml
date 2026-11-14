@@ -18,9 +18,14 @@ jobs:
           chmod +x scripts/build-deb.sh
           ./scripts/build-deb.sh
 
+      - name: Create checksums
+        run: sha256sum dist/*.deb > dist/SHA256SUMS
+
       - name: Приложить к релизу
         uses: softprops/action-gh-release@v2
         with:
           name: nullfetch ${{ github.ref_name }}
           generate_release_notes: true
-          files: dist/*.deb
+          files: |
+            dist/*.deb
+            dist/SHA256SUMS

@@ -20,7 +20,7 @@
 - 👤 user and hostname
 - 🐧 distribution and kernel
 - 🖥️ CPU and GPU
-- 🧠 RAM and disk usage with bars and percentages
+- 🧠 RAM and disk usage with precise GiB values, bars and percentages
 - 🎨 distro logo, colored with your distro's color (truecolor, 256-color fallback)
 - 🧩 text next to the logo, like a real fetch
 - 🖼 `--logo NAME` to pick any logo from `logos.py`
@@ -28,6 +28,7 @@
 - 🔤 `--ascii` for terminals without block characters
 - 📏 `--width N` and `--oneline` for scripts and status bars
 - 🎛 `--accent COLOR` and `--logo-file FILE`
+- 📋 `--list-logos` to show all built-in logo names
 - 🙈 `--no-logo` for a text-only output
 - 🎯 `--only` to pick fields
 - 🤖 `--json` for scripts
@@ -41,6 +42,13 @@
 git clone https://github.com/pybindi/nullfetch.git
 cd nullfetch
 ./install.sh
+```
+
+The installer also installs bash, zsh and fish completions under
+`~/.local/share`. To install them separately:
+
+```bash
+./scripts/install-completions.sh
 ```
 
 `install.sh` puts the script into `~/.local/bin`. To use another prefix:
@@ -74,7 +82,7 @@ for GPU detection.
 A prebuilt `.deb` is attached to every release:
 
 ```bash
-sudo apt install ./nullfetch_1.5.0_all.deb
+sudo apt install ./nullfetch_1.6.0_all.deb
 ```
 
 Or build it from source:
@@ -82,7 +90,13 @@ Or build it from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_1.5.0_all.deb
+sudo apt install ./dist/nullfetch_1.6.0_all.deb
+```
+
+Each release also includes `SHA256SUMS` for verifying the downloaded package:
+
+```bash
+sha256sum -c SHA256SUMS
 ```
 
 ## 🚀 Usage
@@ -111,6 +125,7 @@ nullfetch --accent '#ff0000' # red logo
 | `--ascii` | ASCII-only bars, ellipsis and separators |
 | `--width N` | Output width in columns |
 | `--oneline` | One compact line for status bars |
+| `--list-logos` | List available logo names and exit |
 | `-o`, `--only FIELDS` | Show only the listed fields |
 | `--json` | Print system info as JSON |
 
@@ -128,6 +143,7 @@ user host os kernel cpu gpu ram disk
 nullfetch --logo arch
 nullfetch --logo cat
 nullfetch --logo none
+nullfetch --list-logos
 ```
 
 Available names: `alpine`, `arch`, `cactus`, `cat`, `coffee`, `computer`,
@@ -175,8 +191,8 @@ time nullfetch >/dev/null
    /                    \      kernel: 6.18.60_1
   /       ________       \     CPU: Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz
  /_______|        |_______\    GPU: Intel Corporation Haswell-ULT Integrated Graphics Controller
- _________  V0ID   ________    RAM: 2 / 7 GB      ███░░░░░░░░░  29%
- \       |________|       /    disk: 31 / 237 GB   ██░░░░░░░░░░  13%
+  _________  V0ID   ________    RAM: 2.4 / 7.7 GiB  ███░░░░░░░░░  31%
+  \       |________|       /    disk: 31.2 / 237.4 GiB ██░░░░░░░░░  13%
   \                      /
    \                    /
     \                  /
@@ -197,8 +213,8 @@ nullfetch --json
   "kernel": "6.18.60_1",
   "cpu": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz",
   "gpu": "Intel Corporation Haswell-ULT Integrated Graphics Controller",
-  "ram": { "used": 3, "total": 7, "percent": 43 },
-  "disk": { "used": 31, "total": 237, "percent": 13 }
+  "ram": { "used": 2.4, "total": 7.7, "percent": 31 },
+  "disk": { "used": 31.2, "total": 237.4, "percent": 13 }
 }
 ```
 
