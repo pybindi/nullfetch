@@ -8,6 +8,6 @@ pkgbase = nullfetch
 	depends = python
 	optdepends = pciutils: GPU detection with lspci
 	source = https://github.com/pybindi/nullfetch/archive/refs/tags/v1.7.0.tar.gz
-	sha256sums = SKIP
+	sha256sums = ff3bac988f9734723b026c5599197bf357c7505e287a4fcf605fc59980e3327f
 
 pkgname = nullfetch
