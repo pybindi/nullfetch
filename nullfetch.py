@@ -9,10 +9,11 @@ import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "1.7.0"
+VERSION = "1.8.0"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -116,6 +117,8 @@ Options:
       --no-color      alias for --color never
       --theme NAME    theme: default, mono, or neon
       --compact       tighter visual layout
+      --save-config   save logo, accent, theme and color mode as defaults
+      --reset-config  remove saved defaults
       --ascii         ASCII-only bars and ellipsis
       --width N       output width in columns
       --oneline       one compact line for status bars
@@ -130,6 +133,8 @@ Examples:
   nullfetch --only cpu,ram
   nullfetch --logo arch
   nullfetch --oneline --only ram,disk
+  nullfetch --logo cat --accent '#ff8800' --save-config
+  nullfetch --reset-config
   nullfetch --no-logo --json
 """
 
@@ -466,6 +471,57 @@ def read_logo_file(path):
 # --- command line ---------------------------------------------------------
 
 
+def config_path():
+    base = os.environ.get("XDG_CONFIG_HOME")
+    return (Path(base) if base else Path.home() / ".config") / "nullfetch/config.json"
+
+
+def config_args():
+    path = config_path()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return []
+    except (OSError, ValueError) as error:
+        fail(f"cannot load config {path}: {error}; use --reset-config")
+    allowed = {"logo", "logo-file", "accent", "theme", "color"}
+    if not isinstance(data, dict) or any(
+        key not in allowed or not isinstance(value, str)
+        for key, value in data.items()
+    ):
+        fail(f"invalid config: {path}; use --reset-config")
+    return [f"--{key}={value}" for key, value in data.items()]
+
+
+def save_config(opts):
+    data = {
+        "logo": opts["logo_name"] if opts["logo"] else "none",
+        "theme": opts["theme"],
+        "color": opts["color_mode"],
+    }
+    if opts["accent"]:
+        data["accent"] = opts["accent"]
+    if opts["logo"] and opts["logo_file"]:
+        data["logo-file"] = str(Path(opts["logo_file"]).expanduser().resolve())
+    path = config_path()
+    temporary = None
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent, delete=False
+        ) as stream:
+            temporary = Path(stream.name)
+            json.dump(data, stream, indent=2)
+            stream.write("\n")
+        os.replace(temporary, path)
+    except OSError as error:
+        fail(f"cannot save config: {error}")
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    print(f"saved defaults: {path}")
+
+
 def fail(message):
     print(f"nullfetch: {message}", file=sys.stderr)
     print("try 'nullfetch --help'", file=sys.stderr)
@@ -500,6 +556,8 @@ def parse_args(argv):
         "list_logos": False,
         "json": False,
         "only": None,
+        "save_config": False,
+        "reset_config": False,
     }
 
     i = 0
@@ -512,20 +570,30 @@ def parse_args(argv):
             opts["version"] = True
         elif arg == "--no-logo":
             opts["logo"] = False
+        elif arg == "--save-config":
+            opts["save_config"] = True
+        elif arg == "--reset-config":
+            opts["reset_config"] = True
         elif arg == "--logo":
             i += 1
             if i == len(argv):
                 fail(f"{arg} needs a value")
             opts["logo_name"] = argv[i]
+            opts["logo_file"] = None
+            opts["logo"] = True
         elif arg.startswith("--logo="):
             opts["logo_name"] = arg.split("=", 1)[1]
+            opts["logo_file"] = None
+            opts["logo"] = True
         elif arg == "--logo-file":
             i += 1
             if i == len(argv):
                 fail(f"{arg} needs a value")
             opts["logo_file"] = argv[i]
+            opts["logo"] = True
         elif arg.startswith("--logo-file="):
             opts["logo_file"] = arg.split("=", 1)[1]
+            opts["logo"] = True
         elif arg == "--accent":
             i += 1
             if i == len(argv):
@@ -600,6 +668,16 @@ def main(argv=None):
 
     opts = parse_args(argv)
 
+    if opts["reset_config"]:
+        try:
+            config_path().unlink(missing_ok=True)
+        except OSError as error:
+            fail(f"cannot reset config: {error}")
+        print("saved defaults reset")
+        return 0
+    if not (opts["help"] or opts["version"] or opts["list_logos"]):
+        opts = parse_args(config_args() + list(argv))
+
     if opts["theme"] not in ("default", "mono", "neon"):
         fail(f"unknown theme: {opts['theme']} (use default, mono, or neon)")
 
@@ -613,6 +691,17 @@ def main(argv=None):
 
     if opts["list_logos"]:
         print("\n".join(sorted(LOGOS)))
+        return 0
+
+    if opts["save_config"]:
+        if opts["accent"]:
+            parse_color(opts["accent"])
+        if opts["logo"]:
+            if opts["logo_file"]:
+                read_logo_file(opts["logo_file"])
+            else:
+                logo_lines(opts["logo_name"])
+        save_config(opts)
         return 0
 
     fields = FIELDS

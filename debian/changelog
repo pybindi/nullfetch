@@ -1,3 +1,11 @@
+nullfetch (1.8.0) unstable; urgency=medium
+
+  * Save the selected logo, accent, theme and color mode permanently.
+  * Add --save-config and --reset-config.
+  * Store configuration atomically under XDG_CONFIG_HOME.
+
+ -- pybindi <sungunboom@gmail.com>  Tue, 24 Nov 2026 12:00:00 +0000
+
 nullfetch (1.7.0) unstable; urgency=medium
 
   * Add automatic color modes and default, mono and neon themes.

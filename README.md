@@ -32,6 +32,7 @@
 - 🎨 `--theme` with `default`, `mono` and bright `neon` styles
 - 🌈 smart colors with `--color auto|always|never`
 - 📐 `--compact` for a tighter visual layout
+- 💾 save your favorite logo and colors permanently
 - 🙈 `--no-logo` for a text-only output
 - 🎯 `--only` to pick fields
 - 🤖 `--json` for scripts
@@ -85,7 +86,7 @@ for GPU detection.
 A prebuilt `.deb` is attached to every release:
 
 ```bash
-sudo apt install ./nullfetch_1.7.0_all.deb
+sudo apt install ./nullfetch_1.8.0_all.deb
 ```
 
 Or build it from source:
@@ -93,7 +94,7 @@ Or build it from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_1.7.0_all.deb
+sudo apt install ./dist/nullfetch_1.8.0_all.deb
 ```
 
 Each release also includes `SHA256SUMS` for verifying the downloaded package:
@@ -116,6 +117,33 @@ nullfetch --theme neon        # bright pink accent
 nullfetch --compact           # tighter layout
 ```
 
+### Permanent logo and color
+
+Save your favorite appearance once:
+
+```bash
+nullfetch --logo cat --accent '#ff8800' --theme neon --save-config
+```
+
+After that, plain `nullfetch` uses the saved logo, accent and theme. Command
+line options still override the saved defaults for one run:
+
+```bash
+nullfetch --logo arch
+```
+
+The configuration is stored in:
+
+```text
+~/.config/nullfetch/config.json
+```
+
+Or under `$XDG_CONFIG_HOME/nullfetch/config.json`. Remove saved settings with:
+
+```bash
+nullfetch --reset-config
+```
+
 ### Options
 
 | Option | Description |
@@ -129,6 +157,8 @@ nullfetch --compact           # tighter layout
 | `--color MODE` | `auto`, `always` or `never` |
 | `--theme NAME` | `default`, `mono` or `neon` |
 | `--compact` | Tighter output for small terminals |
+| `--save-config` | Save logo, color and theme as defaults |
+| `--reset-config` | Remove saved defaults |
 | `--no-color` | Disable colors (also honors `NO_COLOR`) |
 | `--ascii` | ASCII-only bars, ellipsis and separators |
 | `--width N` | Output width in columns |

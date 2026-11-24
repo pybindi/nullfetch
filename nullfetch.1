@@ -1,4 +1,4 @@
-.TH NULLFETCH 1 "2026-11-14" "nullfetch 1.7.0" "User Commands"
+.TH NULLFETCH 1 "2026-11-14" "nullfetch 1.8.0" "User Commands"
 .SH NAME
 nullfetch \- tiny system fetch for Linux
 .SH SYNOPSIS
@@ -38,6 +38,12 @@ Visual theme: \fIdefault\fR, \fImono\fR, or \fIneon\fR.
 .B \-\-compact
 Use a tighter visual layout.
 .TP
+.B \-\-save\-config
+Save the selected logo, accent, theme and color mode as defaults.
+.TP
+.B \-\-reset\-config
+Remove saved defaults.
+.TP
 .B \-\-no\-color
 Disable colors.
 .TP
@@ -73,6 +79,9 @@ Use the cat logo.
 .TP
 .B nullfetch \-\-oneline \-\-only ram,disk
 One compact line with memory and disk usage.
+.TP
+.B nullfetch \-\-logo cat \-\-accent '#ff8800' \-\-save\-config
+Save a cat logo and orange accent for future runs.
 .SH ENVIRONMENT
 .TP
 .B NO_COLOR

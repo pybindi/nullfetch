@@ -17,6 +17,12 @@ ENV["TERM"] = "xterm-256color"
 ENV["COLORTERM"] = "truecolor"
 
 
+@pytest.fixture(autouse=True)
+def isolated_config(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setitem(ENV, "XDG_CONFIG_HOME", str(tmp_path))
+
+
 def run(*args):
     return subprocess.run(
         [sys.executable, str(SCRIPT), *args],
