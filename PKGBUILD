@@ -9,7 +9,7 @@ license=('MIT')
 depends=('python')
 optdepends=('pciutils: GPU detection with lspci')
 source=("$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('0ee38399bc625fe62cea9d6bee72711ed74661e799879bb22044c88c3ac197c1')
+sha256sums=('e448bb8886cbbbf2c65818b3227219f7ceee4329b43e543bf0cbcdb7a6b4e9f4')
 
 package() {
     cd "nullfetch-$pkgver"
