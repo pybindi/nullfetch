@@ -29,7 +29,8 @@
 - 📏 `--width N` and `--oneline` for scripts and status bars
 - 🎛 `--accent COLOR` and `--logo-file FILE`
 - 📋 `--list-logos` to show all built-in logo names
-- 🎨 `--theme` with `default`, `mono` and bright `neon` styles
+- 🎨 `--theme` with `default`, `light`, `mono` and bright `neon` styles
+- 🖍 `--accent blue`, `--accent tux` or any `#rrggbb` color
 - 🌈 smart colors with `--color auto|always|never`
 - 📐 `--compact` for a tighter visual layout
 - 💾 save your favorite logo and colors permanently
@@ -86,7 +87,7 @@ for GPU detection.
 A prebuilt `.deb` is attached to every release:
 
 ```bash
-sudo apt install ./nullfetch_1.8.0_all.deb
+sudo apt install ./nullfetch_1.9.0_all.deb
 ```
 
 Or build it from source:
@@ -94,7 +95,7 @@ Or build it from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_1.8.0_all.deb
+sudo apt install ./dist/nullfetch_1.9.0_all.deb
 ```
 
 Each release also includes `SHA256SUMS` for verifying the downloaded package:
@@ -113,7 +114,9 @@ nullfetch --json             # machine-readable output
 nullfetch --oneline          # one line for a status bar
 nullfetch --ascii            # no block characters
 nullfetch --accent '#ff0000' # red logo
-nullfetch --theme neon        # bright pink accent
+nullfetch --accent blue      # named color
+nullfetch --theme light      # for light terminals
+nullfetch --theme neon       # bright pink accent
 nullfetch --compact           # tighter layout
 ```
 
@@ -122,8 +125,25 @@ nullfetch --compact           # tighter layout
 Save your favorite appearance once:
 
 ```bash
-nullfetch --logo cat --accent '#ff8800' --theme neon --save-config
+nullfetch --logo cat --accent orange --theme neon --save-config
 ```
+
+Check what is saved:
+
+```bash
+nullfetch --show-config
+```
+
+Colors can be written as a name:
+
+```text
+black red green yellow blue magenta cyan white gray grey
+orange pink purple tux
+```
+
+Distribution names also work: `void`, `arch`, `debian`, `ubuntu`, `fedora`,
+`opensuse`, `alpine`, `gentoo`, `nixos`, `manjaro`, `mint`, `kali`,
+`raspbian`, `pop`.
 
 After that, plain `nullfetch` uses the saved logo, accent and theme. Command
 line options still override the saved defaults for one run:
@@ -153,11 +173,12 @@ nullfetch --reset-config
 | `--no-logo` | Hide the ASCII logo |
 | `--logo NAME` | Logo to show: `auto`, `none`, or a name from `logos.py` |
 | `--logo-file FILE` | Use a custom ASCII art file |
-| `--accent COLOR` | Accent color in `#rrggbb` |
+| `--accent COLOR` | Color name or `#rrggbb` |
 | `--color MODE` | `auto`, `always` or `never` |
-| `--theme NAME` | `default`, `mono` or `neon` |
+| `--theme NAME` | `default`, `light`, `mono` or `neon` |
 | `--compact` | Tighter output for small terminals |
 | `--save-config` | Save logo, color and theme as defaults |
+| `--show-config` | Show saved defaults |
 | `--reset-config` | Remove saved defaults |
 | `--no-color` | Disable colors (also honors `NO_COLOR`) |
 | `--ascii` | ASCII-only bars, ellipsis and separators |

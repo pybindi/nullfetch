@@ -102,6 +102,9 @@ def test_themes():
     assert "38;2;255;80;220" in run(
         "--theme", "neon", "--color", "always"
     ).stdout
+    assert "38;2;23;78;166" in run(
+        "--theme", "light", "--color", "always"
+    ).stdout
 
 
 def test_theme_invalid():
@@ -266,9 +269,18 @@ def test_accent():
 
 
 def test_accent_invalid():
-    result = run("--accent", "red")
+    result = run("--accent", "notacolor")
     assert result.returncode == 2
     assert "invalid color" in result.stderr
+
+
+def test_named_accent_colors():
+    out = run("--accent", "tux", "--logo", "linux", "--color", "always").stdout
+    assert "38;2;30;58;138" in out
+    out = run("--accent", "void", "--logo", "linux", "--color", "always").stdout
+    assert "38;2;71;128;97" in out
+    out = run("--accent", "orange", "--logo", "linux", "--color", "always").stdout
+    assert "38;2;255;136;0" in out
 
 
 def test_logo_file(tmp_path):

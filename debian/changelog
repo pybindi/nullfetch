@@ -1,3 +1,11 @@
+nullfetch (1.9.0) unstable; urgency=medium
+
+  * Add the light theme for light terminals.
+  * Accept color names such as blue, orange, tux and distro names.
+  * Add --show-config to print saved defaults.
+
+ -- pybindi <sungunboom@gmail.com>  Wed, 25 Nov 2026 12:00:00 +0000
+
 nullfetch (1.8.0) unstable; urgency=medium
 
   * Save the selected logo, accent, theme and color mode permanently.

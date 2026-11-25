@@ -13,7 +13,7 @@ import tempfile
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -59,6 +59,28 @@ DISTRO_COLORS = {
 }
 
 DEFAULT_COLOR = (88, 166, 255)
+
+NAMED_COLORS = {
+    "black": (0, 0, 0),
+    "red": (220, 50, 47),
+    "green": (64, 160, 43),
+    "yellow": (202, 169, 0),
+    "blue": (38, 109, 211),
+    "magenta": (163, 90, 190),
+    "cyan": (17, 150, 155),
+    "white": (255, 255, 255),
+    "gray": (120, 120, 120),
+    "grey": (120, 120, 120),
+    "orange": (255, 136, 0),
+    "pink": (255, 105, 180),
+    "purple": (140, 80, 200),
+    "tux": (30, 58, 138),
+}
+
+THEME_ACCENTS = {
+    "light": (23, 78, 166),
+    "neon": (255, 80, 220),
+}
 
 ART = r"""        .--.
        |o_o |
@@ -112,12 +134,13 @@ Options:
       --logo NAME     logo: auto, none, or one of:
                       {LOGO_NAMES}
       --logo-file F   use a custom ASCII art file
-      --accent COLOR  accent color, e.g. #ff0000
+      --accent COLOR  accent color: blue, tux, #ff0000, ...
       --color MODE    color mode: auto, always, or never
       --no-color      alias for --color never
-      --theme NAME    theme: default, mono, or neon
+      --theme NAME    theme: default, light, mono, or neon
       --compact       tighter visual layout
       --save-config   save logo, accent, theme and color mode as defaults
+      --show-config   show saved defaults
       --reset-config  remove saved defaults
       --ascii         ASCII-only bars and ellipsis
       --width N       output width in columns
@@ -442,12 +465,17 @@ def oneline(data, ascii_mode=False):
 
 
 def parse_color(text):
+    name = text.lower()
+    if name in NAMED_COLORS:
+        return NAMED_COLORS[name]
+    if name in DISTRO_COLORS:
+        return DISTRO_COLORS[name]
     if len(text) == 7 and text.startswith("#"):
         try:
             return tuple(int(text[i : i + 2], 16) for i in (1, 3, 5))
         except ValueError:
             pass
-    fail(f"invalid color: {text} (expected #rrggbb)")
+    fail(f"invalid color: {text} (expected #rrggbb or a color name)")
 
 
 def read_logo_file(path):
@@ -491,6 +519,21 @@ def config_args():
     ):
         fail(f"invalid config: {path}; use --reset-config")
     return [f"--{key}={value}" for key, value in data.items()]
+
+
+def show_config():
+    path = config_path()
+    if not path.exists():
+        print(f"no saved defaults: {path}")
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        fail(f"cannot load config {path}: {error}; use --reset-config")
+    print(f"config: {path}")
+    for key in ("logo", "logo-file", "accent", "theme", "color"):
+        if key in data:
+            print(f"{key}: {data[key]}")
 
 
 def save_config(opts):
@@ -557,6 +600,7 @@ def parse_args(argv):
         "json": False,
         "only": None,
         "save_config": False,
+        "show_config": False,
         "reset_config": False,
     }
 
@@ -572,6 +616,8 @@ def parse_args(argv):
             opts["logo"] = False
         elif arg == "--save-config":
             opts["save_config"] = True
+        elif arg == "--show-config":
+            opts["show_config"] = True
         elif arg == "--reset-config":
             opts["reset_config"] = True
         elif arg == "--logo":
@@ -675,11 +721,14 @@ def main(argv=None):
             fail(f"cannot reset config: {error}")
         print("saved defaults reset")
         return 0
+    if opts["show_config"]:
+        show_config()
+        return 0
     if not (opts["help"] or opts["version"] or opts["list_logos"]):
         opts = parse_args(config_args() + list(argv))
 
-    if opts["theme"] not in ("default", "mono", "neon"):
-        fail(f"unknown theme: {opts['theme']} (use default, mono, or neon)")
+    if opts["theme"] not in ("default", "light", "mono", "neon"):
+        fail(f"unknown theme: {opts['theme']} (use default, light, mono, or neon)")
 
     if opts["help"]:
         print(HELP)
@@ -729,8 +778,8 @@ def main(argv=None):
     accent = parse_color(opts["accent"]) if opts["accent"] else None
     if opts["theme"] == "mono":
         opts["color"] = False
-    elif opts["theme"] == "neon" and accent is None:
-        accent = (255, 80, 220)
+    elif accent is None and opts["theme"] in THEME_ACCENTS:
+        accent = THEME_ACCENTS[opts["theme"]]
 
     if not opts["logo"]:
         art = []

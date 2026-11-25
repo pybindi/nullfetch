@@ -1,4 +1,4 @@
-.TH NULLFETCH 1 "2026-11-14" "nullfetch 1.8.0" "User Commands"
+.TH NULLFETCH 1 "2026-11-14" "nullfetch 1.9.0" "User Commands"
 .SH NAME
 nullfetch \- tiny system fetch for Linux
 .SH SYNOPSIS
@@ -27,19 +27,23 @@ from \fBlogos.py\fR.
 Use a custom ASCII art file.
 .TP
 .BR \-\-accent " " \fICOLOR\fR
-Accent color in \fB#rrggbb\fR form.
+Accent color as a name (\fIblue\fR, \fItux\fR, \fIorange\fR, a distribution
+name) or in \fB#rrggbb\fR form.
 .TP
 .BR \-\-color " " \fIMODE\fR
 Color mode: \fIauto\fR, \fIalways\fR, or \fInever\fR.
 .TP
 .BR \-\-theme " " \fINAME\fR
-Visual theme: \fIdefault\fR, \fImono\fR, or \fIneon\fR.
+Visual theme: \fIdefault\fR, \fIlight\fR, \fImono\fR, or \fIneon\fR.
 .TP
 .B \-\-compact
 Use a tighter visual layout.
 .TP
 .B \-\-save\-config
 Save the selected logo, accent, theme and color mode as defaults.
+.TP
+.B \-\-show\-config
+Show saved defaults.
 .TP
 .B \-\-reset\-config
 Remove saved defaults.
@@ -80,8 +84,11 @@ Use the cat logo.
 .B nullfetch \-\-oneline \-\-only ram,disk
 One compact line with memory and disk usage.
 .TP
-.B nullfetch \-\-logo cat \-\-accent '#ff8800' \-\-save\-config
+.B nullfetch \-\-logo cat \-\-accent orange \-\-save\-config
 Save a cat logo and orange accent for future runs.
+.TP
+.B nullfetch \-\-show\-config
+Show saved defaults.
 .SH ENVIRONMENT
 .TP
 .B NO_COLOR

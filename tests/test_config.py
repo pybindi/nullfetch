@@ -61,7 +61,7 @@ def test_invalid_choice_not_saved():
         nullfetch.main(["--logo=nope", "--save-config"])
     assert not nullfetch.config_path().exists()
     with pytest.raises(SystemExit):
-        nullfetch.main(["--accent=red", "--save-config"])
+        nullfetch.main(["--accent=notacolor", "--save-config"])
     assert not nullfetch.config_path().exists()
 
 
@@ -88,3 +88,30 @@ def test_default_config_path(monkeypatch, tmp_path):
     monkeypatch.delenv("XDG_CONFIG_HOME")
     monkeypatch.setenv("HOME", str(tmp_path))
     assert nullfetch.config_path() == tmp_path / ".config/nullfetch/config.json"
+
+
+def test_show_config_empty(capsys):
+    assert nullfetch.main(["--show-config"]) == 0
+    assert "no saved defaults" in capsys.readouterr().out
+
+
+def test_show_config_saved(capsys):
+    nullfetch.main(
+        ["--logo=cat", "--accent=blue", "--theme=light", "--save-config"]
+    )
+    capsys.readouterr()
+    assert nullfetch.main(["--show-config"]) == 0
+    out = capsys.readouterr().out
+    assert f"config: {nullfetch.config_path()}" in out
+    assert "logo: cat" in out
+    assert "accent: blue" in out
+    assert "theme: light" in out
+
+
+def test_show_config_broken(capsys):
+    path = nullfetch.config_path()
+    path.parent.mkdir(parents=True)
+    path.write_text("broken")
+    with pytest.raises(SystemExit):
+        nullfetch.main(["--show-config"])
+    assert "cannot load config" in capsys.readouterr().err

@@ -7,15 +7,18 @@ _nullfetch() {
         '--no-logo[hide the ASCII logo]' \
         '--logo[logo to show]:logo:(auto none alpine arch cactus cat coffee computer cow debian fedora frog gentoo ghost linux mint moon nixos opensuse penguin robot rocket skull tree ubuntu void)' \
         '--logo-file[custom ASCII art file]:file:_files' \
-        '--accent[accent color]:color:' \
+        '--accent[accent color]:color:(black red green yellow blue magenta cyan white gray grey orange pink purple tux void arch debian ubuntu fedora opensuse alpine gentoo nixos manjaro mint kali raspbian pop)' \
         '--color[color mode]:mode:(auto always never)' \
-        '--theme[visual theme]:theme:(default mono neon)' \
+        '--theme[visual theme]:theme:(default light mono neon)' \
         '--compact[tighter visual layout]' \
         '--no-color[disable colors]' \
         '--ascii[ASCII-only output]' \
         '--width[output width]:columns:' \
         '--oneline[one compact line]' \
         '--list-logos[list available logos]' \
+        '--save-config[save current look as defaults]' \
+        '--show-config[show saved defaults]' \
+        '--reset-config[remove saved defaults]' \
         '(-o --only)'{-o,--only}'[show only these fields]:fields:(user host os kernel cpu gpu ram disk)' \
         '--json[print system info as JSON]'
 }
