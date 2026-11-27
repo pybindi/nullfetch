@@ -385,7 +385,7 @@ fn truncate_visible(s: &str, max: usize, ascii: bool) -> String {
 }
 
 fn render_text(specs: &[ModuleSpec], data: &BTreeMap<String, modules::Value>, opts: &Opts) {
-    let accent = render::resolve_accent(opts.accent.as_deref(), &opts.theme);
+    let accent = render::resolve_accent(opts.accent.as_deref(), &opts.theme, &opts.logo_name);
     let (mut logo, _precolored) = get_logo(opts);
     let info = render::render_info_lines_spec(specs, data, opts, accent);
 

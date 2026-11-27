@@ -59,11 +59,14 @@ pub fn named_color(s: &str) -> Option<(u8,u8,u8)> {
     }
 }
 
-pub fn resolve_accent(accent: Option<&str>, theme: &str) -> Option<(u8,u8,u8)> {
+pub fn resolve_accent(accent: Option<&str>, theme: &str, logo: &str) -> Option<(u8,u8,u8)> {
     if let Some(a)=accent {
         return parse_hex_color(a).or_else(|| named_color(a));
     }
-    theme_accent(theme)
+    if let Some(t)=theme_accent(theme) { return Some(t); }
+    let dc = crate::logos::distro_colors();
+    if let Some(c)=dc.get(logo) { return named_color(c); }
+    None
 }
 
 pub fn bar(used: f64, total: f64, width: usize, style: &str, ascii: bool) -> String {

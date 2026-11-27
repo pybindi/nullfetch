@@ -36,5 +36,10 @@ pub fn aliases() -> HashMap<&'static str, &'static str> {
 
 pub fn distro_colors() -> HashMap<&'static str, &'static str> {
     let mut m = HashMap::new();
+    for (k,v) in [
+        ("arch","cyan"),("ubuntu","orange"),("debian","red"),("fedora","blue"),("mint","green"),
+        ("nixos","cyan"),("gentoo","magenta"),("void","green"),("alpine","blue"),("opensuse","green"),
+        ("linux","white"),("windows","blue"),("macos","white")
+    ] { m.insert(k,v); }
     m
 }
