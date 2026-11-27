@@ -1,6 +1,6 @@
 # Maintainer: pybindi <sungunboom@gmail.com>
 pkgname=nullfetch
-pkgver=2.0.0
+pkgver=2.1.0
 pkgrel=1
 pkgdesc="A tiny system fetch for Linux — pure Python, zero dependencies"
 arch=('any')

@@ -119,7 +119,7 @@ Set the release archive checksum in `PKGBUILD` / `.SRCINFO` after tagging a rele
 #### Debian / Ubuntu
 
 ```bash
-sudo apt install ./nullfetch_2.0.0_all.deb
+sudo apt install ./nullfetch_2.1.0_all.deb
 ```
 
 Build from source:
@@ -127,7 +127,7 @@ Build from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_2.0.0_all.deb
+sudo apt install ./dist/nullfetch_2.1.0_all.deb
 ```
 
 Verify release checksums:

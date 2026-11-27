@@ -1,3 +1,11 @@
+nullfetch (2.1.0) unstable; urgency=medium
+
+  * Add presets, doctor diagnostics, and command modules.
+  * Add loadavg, boot_time, and init modules.
+  * Show slowest modules in --timing output.
+
+ -- pybindi <sungunboom@gmail.com>  Fri, 27 Nov 2026 12:00:00 +0000
+
 nullfetch (2.0.0) unstable; urgency=medium
 
   * Add terminal images: built-in PNG renderer plus chafa, viu, jp2,
