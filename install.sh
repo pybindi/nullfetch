@@ -10,6 +10,7 @@ bindir="$prefix/bin"
 install -d "$bindir" "$prefix/share/nullfetch"
 install -m755 nullfetch.py "$bindir/nullfetch"
 install -m644 logos.py "$prefix/share/nullfetch/logos.py"
+install -m644 nullfetch_image.py "$prefix/share/nullfetch/nullfetch_image.py"
 ./scripts/install-completions.sh
 
 echo "installed: $bindir/nullfetch"

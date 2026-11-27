@@ -22,6 +22,7 @@ mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/share/doc/nullfetch" \
 
 install -Dm755 nullfetch.py "$pkg/usr/bin/nullfetch"
 install -Dm644 logos.py "$pkg/usr/share/nullfetch/logos.py"
+install -Dm644 nullfetch_image.py "$pkg/usr/share/nullfetch/nullfetch_image.py"
 install -Dm644 scripts/completions/nullfetch.bash \
     "$pkg/usr/share/bash-completion/completions/nullfetch"
 install -Dm644 scripts/completions/_nullfetch \

@@ -32,7 +32,10 @@ Changelog = "https://github.com/pybindi/nullfetch/releases"
 nullfetch = "nullfetch:main"
 
 [tool.setuptools]
-py-modules = ["nullfetch", "logos"]
+py-modules = ["nullfetch", "logos", "nullfetch_image"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.setuptools.dynamic]
 version = { attr = "nullfetch.VERSION" }
@@ -40,6 +43,7 @@ version = { attr = "nullfetch.VERSION" }
 [tool.ruff]
 line-length = 88
 target-version = "py310"
+extend-exclude = ["nullfetch/**"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

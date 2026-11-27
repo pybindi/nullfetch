@@ -1,6 +1,6 @@
 # Maintainer: pybindi <sungunboom@gmail.com>
 pkgname=nullfetch
-pkgver=1.9.0
+pkgver=2.0.0
 pkgrel=1
 pkgdesc="A tiny system fetch for Linux — pure Python, zero dependencies"
 arch=('any')
@@ -9,12 +9,14 @@ license=('MIT')
 depends=('python')
 optdepends=('pciutils: GPU detection with lspci')
 source=("$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('e448bb8886cbbbf2c65818b3227219f7ceee4329b43e543bf0cbcdb7a6b4e9f4')
+# Replace SKIP with the archive checksum after tagging v2.0.0.
+sha256sums=('SKIP')
 
 package() {
     cd "nullfetch-$pkgver"
     install -Dm755 nullfetch.py "$pkgdir/usr/bin/nullfetch"
     install -Dm644 logos.py "$pkgdir/usr/share/nullfetch/logos.py"
+    install -Dm644 nullfetch_image.py "$pkgdir/usr/share/nullfetch/nullfetch_image.py"
     install -Dm644 scripts/completions/nullfetch.bash "$pkgdir/usr/share/bash-completion/completions/nullfetch"
     install -Dm644 scripts/completions/_nullfetch "$pkgdir/usr/share/zsh/site-functions/_nullfetch"
     install -Dm644 scripts/completions/nullfetch.fish "$pkgdir/usr/share/fish/vendor_completions.d/nullfetch.fish"

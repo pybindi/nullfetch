@@ -1,25 +1,48 @@
 #compdef nullfetch
 
 _nullfetch() {
+    local fields='user host os kernel arch uptime cpu cpu_cores gpu ram swap disk disks network local_ip public_ip battery temperature resolution shell terminal de wm packages processes locale timezone date'
+    local themes='default mono light neon dark nord gruvbox dracula tokyo solarized matrix'
+    local image_modes='auto blocks ascii kitty iterm chafa viu jp2 img2txt timg sixel'
     _arguments \
         '(-h --help)'{-h,--help}'[show help]' \
         '--version[show version]' \
         '--no-logo[hide the ASCII logo]' \
         '--logo[logo to show]:logo:(auto none alpine arch cactus cat coffee computer cow debian fedora frog gentoo ghost linux mint moon nixos opensuse penguin robot rocket skull tree ubuntu void)' \
         '--logo-file[custom ASCII art file]:file:_files' \
+        '--image[image to show]:file:_files' \
+        '--image-file[image to show]:file:_files' \
+        '--image-mode[image renderer]:mode:('$image_modes')' \
+        '--image-width[image width in columns]:columns:' \
+        '--image-height[image height in lines]:lines:' \
+        '--image-position[image position]:position:(side top bottom)' \
+        '--image-bg[transparent pixel color]:color:()' \
         '--accent[accent color]:color:(black red green yellow blue magenta cyan white gray grey orange pink purple tux void arch debian ubuntu fedora opensuse alpine gentoo nixos manjaro mint kali raspbian pop)' \
         '--color[color mode]:mode:(auto always never)' \
-        '--theme[visual theme]:theme:(default light mono neon)' \
+        '--theme[visual theme]:theme:('$themes')' \
         '--compact[tighter visual layout]' \
         '--no-color[disable colors]' \
         '--ascii[ASCII-only output]' \
         '--width[output width]:columns:' \
         '--oneline[one compact line]' \
         '--list-logos[list available logos]' \
+        '--list-fields[list available fields]' \
+        '--list-image-modes[list image renderers]' \
         '--save-config[save current look as defaults]' \
         '--show-config[show saved defaults]' \
         '--reset-config[remove saved defaults]' \
-        '(-o --only)'{-o,--only}'[show only these fields]:fields:(user host os kernel cpu gpu ram disk)' \
+        '--init-config[write example config]' \
+        '--set[change one config value]:key=value:' \
+        '--config[alternate config file]:file:_files' \
+        '--all[show every module]' \
+        '--separator[label separator]:text:' \
+        '--bar-width[bar width]:columns:' \
+        '--bar-style[bar style]:style:(blocks ascii arrows dots lines)' \
+        '--format[output format]:format:(text json csv markdown oneline)' \
+        '--no-cache[ignore cached values]' \
+        '--no-network[disable network modules]' \
+        '--timing[print collection time]' \
+        '(-o --only)'{-o,--only}'[show only these fields]:fields:('$fields')' \
         '--json[print system info as JSON]'
 }
 

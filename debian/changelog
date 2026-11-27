@@ -1,3 +1,13 @@
+nullfetch (2.0.0) unstable; urgency=medium
+
+  * Add terminal images: built-in PNG renderer plus chafa, viu, jp2,
+    img2txt, timg, Kitty and iTerm2 protocols.
+  * Add 20 new modules, --all, --list-fields and CSV/Markdown output.
+  * Collect modules in parallel and cache slow values.
+  * Extend configuration with modules, separators, bars and image options.
+
+ -- pybindi <sungunboom@gmail.com>  Thu, 26 Nov 2026 12:00:00 +0000
+
 nullfetch (1.9.0) unstable; urgency=medium
 
   * Add the light theme for light terminals.

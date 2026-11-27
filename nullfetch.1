@@ -1,13 +1,13 @@
-.TH NULLFETCH 1 "2026-11-14" "nullfetch 1.9.0" "User Commands"
+.TH NULLFETCH 1 "2026-11-26" "nullfetch 2.0.0" "User Commands"
 .SH NAME
-nullfetch \- tiny system fetch for Linux
+nullfetch \- tiny system fetch for Linux with terminal images
 .SH SYNOPSIS
 .B nullfetch
 .RI [ options ]
 .SH DESCRIPTION
 .B nullfetch
-prints system information next to an ASCII logo. It uses only the Python
-standard library and needs no configuration.
+prints system information next to an ASCII logo or a terminal image. It uses
+only the Python standard library; external image converters are optional.
 .SH OPTIONS
 .TP
 .BR \-h ", " \-\-help
@@ -20,33 +20,92 @@ Show version and exit.
 Hide the ASCII logo.
 .TP
 .BR \-\-logo " " \fINAME\fR
-Show the given logo: \fIauto\fR (distribution logo), \fInone\fR, or a name
-from \fBlogos.py\fR.
+Show the given logo: \fIauto\fR, \fInone\fR, or a name from \fBlogos.py\fR.
 .TP
 .BR \-\-logo\-file " " \fIFILE\fR
 Use a custom ASCII art file.
 .TP
+.BR \-\-image " " \fIFILE\fR ", " \-\-image\-file " " \fIFILE\fR
+Show an image next to the system information.
+.TP
+.BR \-\-image\-mode " " \fIMODE\fR
+Renderer: \fIauto\fR, \fIblocks\fR, \fIascii\fR, \fIkitty\fR, \fIiterm\fR,
+\fIchafa\fR, \fIviu\fR, \fIjp2\fR, \fIimg2txt\fR, \fItimg\fR or \fIsixel\fR.
+.TP
+.BR \-\-image\-width " " \fIN\fR ", " \-\-image\-height " " \fIN\fR
+Image size in terminal cells.
+.TP
+.BR \-\-image\-position " " \fIP\fR
+Place the image at \fIside\fR, \fItop\fR or \fIbottom\fR.
+.TP
+.BR \-\-image\-bg " " \fICOLOR\fR
+Color behind transparent pixels.
+.TP
 .BR \-\-accent " " \fICOLOR\fR
-Accent color as a name (\fIblue\fR, \fItux\fR, \fIorange\fR, a distribution
-name) or in \fB#rrggbb\fR form.
+Accent color as a name, distribution name or \fB#rrggbb\fR.
 .TP
 .BR \-\-color " " \fIMODE\fR
 Color mode: \fIauto\fR, \fIalways\fR, or \fInever\fR.
 .TP
 .BR \-\-theme " " \fINAME\fR
-Visual theme: \fIdefault\fR, \fIlight\fR, \fImono\fR, or \fIneon\fR.
+Visual theme: \fIdefault\fR, \fImono\fR, \fIlight\fR, \fIneon\fR, \fIdark\fR,
+\fInord\fR, \fIgruvbox\fR, \fIdracula\fR, \fItokyo\fR, \fIsolarized\fR or
+\fImatrix\fR.
 .TP
 .B \-\-compact
 Use a tighter visual layout.
 .TP
+.B \-\-all
+Show every available module.
+.TP
+.B \-\-list\-fields
+List module names and exit.
+.TP
+.B \-\-list\-image\-modes
+List image rendering modes and exit.
+.TP
+.BR \-\-separator " " \fITEXT\fR
+Text printed between a label and its value.
+.TP
+.BR \-\-bar\-width " " \fIN\fR
+Width of RAM, swap and disk bars.
+.TP
+.BR \-\-bar\-style " " \fISTYLE\fR
+\fIblocks\fR, \fIascii\fR, \fIarrows\fR, \fIdots\fR or \fIlines\fR.
+.TP
+.BR \-\-format " " \fIFORMAT\fR
+Output format: \fItext\fR, \fIjson\fR, \fIcsv\fR, \fImarkdown\fR or
+\fIoneline\fR.
+.TP
+.B \-\-no\-cache
+Ignore cached values and the image cache.
+.TP
+.BR \-\-cache\-ttl " " \fIN\fR
+Lifetime of cached slow values in seconds.
+.TP
+.B \-\-no\-network
+Skip network modules.
+.TP
+.B \-\-timing
+Print module collection time on stderr.
+.TP
 .B \-\-save\-config
-Save the selected logo, accent, theme and color mode as defaults.
+Save the selected appearance and modules as defaults.
 .TP
 .B \-\-show\-config
 Show saved defaults.
 .TP
 .B \-\-reset\-config
 Remove saved defaults.
+.TP
+.B \-\-init\-config
+Write an example configuration file.
+.TP
+.BR \-\-set " " \fIKEY=VALUE\fR
+Change one value in the saved configuration.
+.TP
+.BR \-\-config " " \fIFILE\fR
+Use an alternate configuration file.
 .TP
 .B \-\-no\-color
 Disable colors.
@@ -64,34 +123,41 @@ Print one compact line for status bars.
 List available logo names and exit.
 .TP
 .BR \-o ", " \-\-only " " \fIFIELDS\fR
-Show only the given fields, comma separated.
+Show only the given modules, comma separated.
 .TP
 .B \-\-json
 Print system information as JSON.
 .SH FIELDS
-user, host, os, kernel, cpu, gpu, ram, disk
+Default: user, host, os, kernel, cpu, gpu, ram, disk.
+.br
+Extra: arch, uptime, cpu_cores, swap, disks, network, local_ip, public_ip,
+battery, temperature, resolution, shell, terminal, de, wm, packages, processes,
+locale, timezone, date.
 .SH EXAMPLES
 .TP
 .B nullfetch \-\-only cpu,ram
 Show only the CPU and RAM lines.
 .TP
-.B nullfetch \-\-no\-logo \-\-json
-Print JSON without a logo.
+.B nullfetch \-\-all
+Show every module.
 .TP
-.B nullfetch \-\-logo cat
-Use the cat logo.
+.B nullfetch \-\-image ~/wallpaper.png \-\-image\-position top
+Show a PNG image above the information.
 .TP
-.B nullfetch \-\-oneline \-\-only ram,disk
-One compact line with memory and disk usage.
+.B nullfetch \-\-format markdown \-\-only os,cpu,ram
+Print a Markdown table.
 .TP
-.B nullfetch \-\-logo cat \-\-accent orange \-\-save\-config
-Save a cat logo and orange accent for future runs.
-.TP
-.B nullfetch \-\-show\-config
-Show saved defaults.
+.B nullfetch \-\-set theme=gruvbox
+Change the saved theme.
 .SH ENVIRONMENT
 .TP
 .B NO_COLOR
 Disable colors when set to a non-empty value.
+.TP
+.B XDG_CONFIG_HOME
+Directory containing \fInullfetch/config.json\fR.
+.TP
+.B XDG_CACHE_HOME
+Directory containing cached values and rendered images.
 .SH LICENSE
 MIT
