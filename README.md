@@ -5,7 +5,7 @@
 # nullfetch
 
 **A fast, tiny, no-nonsense system fetch for Linux.**  
-Pure Python. Zero required dependencies. Terminal images. 31 modules. Presets. Command modules. Your config.
+Fast Rust core. Python fallback. Zero required dependencies. Terminal images. 37+ modules. Presets. Command modules. Your config.
 
 <p>
   <a href="https://github.com/pybindi/nullfetch/releases"><img src="https://img.shields.io/github/v/release/pybindi/nullfetch?style=for-the-badge&color=478061&label=release" alt="Release"></a>
@@ -38,7 +38,7 @@ Pure Python. Zero required dependencies. Terminal images. 31 modules. Presets. C
 | **Looks good everywhere** | ASCII logos, distro colors, themes, custom separators, bar styles, compact layout, and plain `--ascii` mode. |
 | **More than logos** | Built-in PNG rendering, Kitty/iTerm2 protocols, and optional external converters for other formats. |
 | **Script-friendly** | `text`, `json`, `csv`, `markdown`, and `oneline` outputs with predictable module selection. |
-| **Runs where you need it** | Linux first, basic Windows support via `nullfetch.bat`. Zero required deps. |
+| **Runs where you need it** | Linux first, basic Windows support via `nullfetch.bat`. Rust binary for speed, Python fallback. |
 
 ## ✨ Features
 
@@ -131,7 +131,7 @@ Set the release archive checksum in `PKGBUILD` / `.SRCINFO` after tagging a rele
 #### Debian / Ubuntu
 
 ```bash
-sudo apt install ./nullfetch_2.1.0_all.deb
+sudo apt install ./nullfetch_3.0.0_all.deb
 ```
 
 Build from source:
@@ -139,7 +139,7 @@ Build from source:
 ```bash
 sudo apt install dpkg-dev
 ./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_2.1.0_all.deb
+sudo apt install ./dist/nullfetch_3.0.0_all.deb
 ```
 
 Verify release checksums:
@@ -346,6 +346,11 @@ nullfetch --timing
 nullfetch --doctor
 nullfetch --only os,kernel,cpu,ram --no-logo
 ```
+
+- Rust release binary for fast startup
+- Parallel module collection
+- Cached slow values under `$XDG_CACHE_HOME/nullfetch`
+- Lazy/cheap `/proc` and `/sys` reads on hot paths
 
 - Concurrent module collection
 - Cached slow values under `$XDG_CACHE_HOME/nullfetch`

@@ -18,7 +18,7 @@ from functools import lru_cache
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "2.1.0"
+VERSION = "3.0.0"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"

@@ -8,3 +8,5 @@ build/
 .coverage
 htmlcov/
 dist/SHA256SUMS
+# Rust
+/target

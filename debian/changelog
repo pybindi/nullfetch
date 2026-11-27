@@ -1,3 +1,11 @@
+nullfetch (3.0.0) unstable; urgency=medium
+
+  * Rust core for fast startup and module collection.
+  * Keep Python CLI as fallback and compatibility layer.
+  * Add more modules and improve cross-platform support.
+
+ -- pybindi <sungunboom@gmail.com>  Fri, 27 Nov 2026 15:00:00 +0000
+
 nullfetch (2.1.0) unstable; urgency=medium
 
   * Add presets, doctor diagnostics, and command modules.

@@ -276,7 +276,7 @@ def test_preset_minimal():
 def test_doctor_output():
     result = run("--doctor")
     assert result.returncode == 0
-    assert "version: 2.1.0" in result.stdout
+    assert "version: 3.0.0" in result.stdout
     assert "image_module:" in result.stdout
 
 
