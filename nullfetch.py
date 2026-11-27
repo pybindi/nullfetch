@@ -18,7 +18,7 @@ from functools import lru_cache
 from itertools import zip_longest
 from pathlib import Path
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -44,6 +44,8 @@ ALL_FIELDS = [
     "kernel",
     "arch",
     "uptime",
+    "boot_time",
+    "loadavg",
     "cpu",
     "cpu_cores",
     "gpu",
@@ -63,6 +65,7 @@ ALL_FIELDS = [
     "wm",
     "packages",
     "processes",
+    "init",
     "locale",
     "timezone",
     "date",
@@ -77,6 +80,8 @@ LABELS = {
     "kernel": "kernel",
     "arch": "arch",
     "uptime": "uptime",
+    "boot_time": "boot",
+    "loadavg": "load",
     "cpu": "CPU",
     "cpu_cores": "cores",
     "gpu": "GPU",
@@ -96,6 +101,7 @@ LABELS = {
     "wm": "WM",
     "packages": "packages",
     "processes": "processes",
+    "init": "init",
     "locale": "locale",
     "timezone": "timezone",
     "date": "date",
@@ -166,6 +172,53 @@ THEME_ACCENTS = {
 }
 THEME_NAMES = ("default", "mono") + tuple(THEME_ACCENTS)
 
+PRESETS = {
+    "minimal": {
+        "modules": ["os", "kernel", "cpu", "ram"],
+        "compact": True,
+        "logo": "auto",
+    },
+    "full": {
+        "all": True,
+        "logo": "auto",
+    },
+    "dev": {
+        "modules": [
+            "os",
+            "kernel",
+            "shell",
+            "terminal",
+            "de",
+            "wm",
+            "cpu",
+            "ram",
+            "disk",
+            "packages",
+            "processes",
+            "init",
+        ],
+        "logo": "auto",
+    },
+    "server": {
+        "modules": [
+            "host",
+            "os",
+            "kernel",
+            "uptime",
+            "loadavg",
+            "cpu",
+            "ram",
+            "disk",
+            "network",
+            "local_ip",
+            "processes",
+            "init",
+        ],
+        "logo": "none",
+        "compact": True,
+    },
+}
+
 ART = r"""        .--.
        |o_o |
        |:_/ |
@@ -220,6 +273,8 @@ IMAGE_MODES = (
     "sixel",
 )
 
+PRESET_NAMES = ", ".join(PRESETS)
+
 HELP = f"""nullfetch {VERSION} - PC info
 
 Usage:
@@ -245,8 +300,11 @@ Options:
       --theme NAME    theme: {THEME_LIST}
       --compact       tighter visual layout
       --all           show every available module
+      --preset NAME   preset: {PRESET_NAMES}
+      --doctor        show terminal/image/cache diagnostics
       --list-fields   list available info fields
       --list-image-modes  list image rendering modes
+      --list-presets  list built-in presets
       --separator S   text between a label and its value (default ": ")
       --bar-width N   width of RAM/disk bars (default {BAR_WIDTH})
       --bar-style S   blocks, ascii, arrows, dots or lines
@@ -270,18 +328,17 @@ Options:
 Fields:
   {" ".join(FIELDS)} (default)
   {" ".join(EXTRA_FIELDS)} (extra: --all or --only)
+  command:<name>:<cmd> (custom command module, --only/--set modules)
 
 Examples:
-  nullfetch --only cpu,ram
+  nullfetch --preset dev
+  nullfetch --preset server --timing
+  nullfetch --only cpu,ram,command:song:playerctl\\ metadata
   nullfetch --all --compact
-  nullfetch --logo arch
+  nullfetch --doctor
   nullfetch --image ~/wallpaper.png --image-mode blocks
-  nullfetch --image photo.jpg --image-mode chafa --image-position top
-  nullfetch --oneline --only ram,disk
-  nullfetch --logo cat --accent '#ff8800' --save-config
   nullfetch --format markdown --only os,cpu,ram
-  nullfetch --reset-config
-  nullfetch --no-logo --json
+  nullfetch --set modules=os,cpu,ram,command:git:git\\ branch\\ --show-current
 """
 
 
@@ -661,6 +718,36 @@ def get_date():
     return datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
+def get_loadavg():
+    try:
+        one, five, fifteen = os.getloadavg()
+    except OSError:
+        return "?"
+    return f"{one:.2f} {five:.2f} {fifteen:.2f}"
+
+
+def get_boot_time():
+    text = read("/proc/stat")
+    for line in text.splitlines():
+        if line.startswith("btime "):
+            value = line.split(None, 1)[1].strip()
+            if value.isdigit():
+                from datetime import datetime
+
+                return datetime.fromtimestamp(int(value)).strftime("%Y-%m-%d %H:%M")
+    return "?"
+
+
+def get_init():
+    comm = read("/proc/1/comm").strip()
+    if comm:
+        return comm
+    cmdline = read("/proc/1/cmdline").replace("\x00", " ").strip()
+    if cmdline:
+        return Path(cmdline.split()[0]).name
+    return "?"
+
+
 GETTERS = {
     "user": get_user,
     "host": get_host,
@@ -668,6 +755,8 @@ GETTERS = {
     "kernel": get_kernel,
     "arch": get_arch,
     "uptime": get_uptime,
+    "boot_time": get_boot_time,
+    "loadavg": get_loadavg,
     "cpu": get_cpu,
     "cpu_cores": get_cpu_cores,
     "gpu": get_gpu,
@@ -687,32 +776,70 @@ GETTERS = {
     "wm": get_wm,
     "packages": get_packages,
     "processes": get_processes,
+    "init": get_init,
     "locale": get_locale,
     "timezone": get_timezone,
     "date": get_date,
 }
 
 
+def run_command_field(cmd, timeout=2):
+    try:
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "?"
+    output = result.stdout.strip() or result.stderr.strip()
+    return output.splitlines()[0] if output else "?"
+
+
 def collect(fields, cache_ttl=300, use_cache=True):
-    """Gather modules in parallel without importing heavyweight libraries."""
+    """Gather modules in parallel; returns (data, timings_ms)."""
+
+    timings = {}
 
     def fetch(key):
+        start = time.perf_counter()
+        if is_command_field(key):
+            spec = parse_command_field(key)
+            ttl = cache_ttl if use_cache else 0
+            cache_name = f"cmd-{spec['key']}-{abs(hash(spec['cmd']))}"
+            if ttl:
+                cached = cache_read(cache_name, ttl)
+                if cached is not None:
+                    timings[key] = (time.perf_counter() - start) * 1000
+                    return cached
+            value = run_command_field(spec["cmd"])
+            if ttl and value != "?":
+                cache_write(cache_name, value)
+            timings[key] = (time.perf_counter() - start) * 1000
+            return value
+
         ttl = min(cache_ttl, SLOW_FIELDS.get(key, 0)) if use_cache else 0
         if ttl:
             cached = cache_read(key, ttl)
             if cached is not None:
+                timings[key] = (time.perf_counter() - start) * 1000
                 return cached
         try:
             value = GETTERS[key]()
         except Exception:
-            return "?"
+            value = "?"
         if ttl and value != "?":
             cache_write(key, value)
+        timings[key] = (time.perf_counter() - start) * 1000
         return value
 
     fields = list(dict.fromkeys(fields))
     if len(fields) < 2:
-        return {key: fetch(key) for key in fields}
+        data = {key: fetch(key) for key in fields}
+        return data, timings
 
     data = {}
     lock = threading.Lock()
@@ -737,7 +864,7 @@ def collect(fields, cache_ttl=300, use_cache=True):
     deadline = time.monotonic() + 10
     for thread in threads:
         thread.join(max(0.0, deadline - time.monotonic()))
-    return {key: data.get(key, "?") for key in fields}
+    return {key: data.get(key, "?") for key in fields}, timings
 
 
 # --- colors ---------------------------------------------------------------
@@ -888,6 +1015,12 @@ def format_size(
     return result
 
 
+def field_label(key):
+    if is_command_field(key):
+        return parse_command_field(key)["key"]
+    return LABELS.get(key, key)
+
+
 def info_lines(
     data,
     use_color,
@@ -904,7 +1037,7 @@ def info_lines(
     indent = len(label_separator) + len(gap)
 
     for key, value in data.items():
-        label = LABELS.get(key, key)
+        label = field_label(key)
 
         if isinstance(value, dict):
             room = max_width - len(label) - indent if max_width else None
@@ -1016,10 +1149,10 @@ def oneline(data, ascii_mode=False):
             if not ("user" in data and "host" in data):
                 parts.append(str(value))
             continue
+        label = field_label(key)
         if isinstance(value, dict):
             parts.append(
-                f"{LABELS[key]} {value['used']}/{value['total']} GiB "
-                f"{value['percent']}%"
+                f"{label} {value['used']}/{value['total']} GiB {value['percent']}%"
             )
         elif isinstance(value, list):
             parts.append(", ".join(str(item) for item in value))
@@ -1043,7 +1176,7 @@ def csv_output(data):
             text = "; ".join(str(item) for item in value)
         else:
             text = str(value)
-        writer.writerow((key, text))
+        writer.writerow((field_label(key), text))
     return stream.getvalue().rstrip("\n")
 
 
@@ -1056,7 +1189,7 @@ def markdown_output(data):
             text = "; ".join(str(item) for item in value)
         else:
             text = str(value).replace("|", "\\|")
-        lines.append(f"| {LABELS.get(key, key)} | {text} |")
+        lines.append(f"| {field_label(key)} | {text} |")
     return "\n".join(lines)
 
 
@@ -1102,6 +1235,7 @@ CONFIG_STRING_KEYS = {
     "accent",
     "theme",
     "color",
+    "preset",
     "image",
     "image-mode",
     "image-position",
@@ -1135,6 +1269,7 @@ CONFIG_DEFAULTS = {
     "image_height": None,
     "bar_width": BAR_WIDTH,
     "cache_ttl": 300,
+    "preset": None,
 }
 CONFIG_OVERRIDE = None
 
@@ -1144,6 +1279,36 @@ def config_path():
         return CONFIG_OVERRIDE
     base = os.environ.get("XDG_CONFIG_HOME")
     return (Path(base) if base else Path.home() / ".config") / "nullfetch/config.json"
+
+
+def is_command_field(name):
+    return isinstance(name, str) and name.startswith("command:")
+
+
+def parse_command_field(text):
+    if not is_command_field(text):
+        return None
+    parts = text.split(":", 2)
+    if len(parts) != 3 or not parts[1].strip() or not parts[2].strip():
+        fail(f"invalid command field: {text} (use command:<name>:<cmd>)")
+    return {
+        "type": "command",
+        "field": text,
+        "key": parts[1].strip(),
+        "cmd": parts[2].strip(),
+    }
+
+
+def normalize_modules(values):
+    modules = []
+    for item in values:
+        if is_command_field(item):
+            modules.append(parse_command_field(item)["field"])
+        elif item in ALL_FIELDS:
+            modules.append(item)
+        else:
+            fail(f"unknown field: {item}")
+    return modules
 
 
 def load_config(path=None):
@@ -1161,9 +1326,14 @@ def load_config(path=None):
             fail(f"invalid config: {path}; use --reset-config")
         if key == "modules":
             if not isinstance(value, list) or not all(
-                isinstance(item, str) and item in ALL_FIELDS for item in value
+                isinstance(item, str) for item in value
             ):
                 fail(f"invalid config: {path}; use --reset-config")
+            for item in value:
+                if is_command_field(item):
+                    parse_command_field(item)
+                elif item not in ALL_FIELDS:
+                    fail(f"invalid config: {path}; use --reset-config")
         elif key in CONFIG_INT_KEYS:
             if not isinstance(value, int) or isinstance(value, bool):
                 fail(f"invalid config: {path}; use --reset-config")
@@ -1175,6 +1345,8 @@ def load_config(path=None):
     if "theme" in data and data["theme"] not in THEME_NAMES:
         fail(f"invalid config: {path}; use --reset-config")
     if "color" in data and data["color"] not in ("auto", "always", "never"):
+        fail(f"invalid config: {path}; use --reset-config")
+    if "preset" in data and data["preset"] not in PRESETS:
         fail(f"invalid config: {path}; use --reset-config")
     return data
 
@@ -1256,21 +1428,25 @@ def set_config_value(text):
             fail(f"invalid boolean for {key}: {value}")
         value = value.lower() in ("true", "yes", "1")
     elif key == "modules":
-        value = [name.strip() for name in value.split(",") if name.strip()]
-        unknown = [name for name in value if name not in ALL_FIELDS]
-        if not value or unknown:
+        value = normalize_modules(
+            [name.strip() for name in value.split(",") if name.strip()]
+        )
+        if not value:
             fail(f"invalid modules: {text}")
     if key == "theme" and value not in THEME_NAMES:
         fail(f"unknown theme: {value}")
     if key == "color" and value not in ("auto", "always", "never"):
         fail(f"invalid color mode: {value}")
+    if key == "preset" and value not in PRESETS:
+        fail(f"unknown preset: {value} (use {', '.join(PRESETS)})")
     if key == "accent":
         parse_color(value)
     path = config_path()
     data = load_config(path)
     data[key] = value
     write_config(path, data)
-    print(f"set {key} = {value}")
+    display = ", ".join(value) if isinstance(value, list) else value
+    print(f"set {key} = {display}")
 
 
 def save_config(opts):
@@ -1316,10 +1492,12 @@ def save_config(opts):
         data["separator"] = opts["separator"]
     if opts["format"] != "text":
         data["format"] = opts["format"]
+    if opts["preset"]:
+        data["preset"] = opts["preset"]
     if opts["only"] is not None:
-        data["modules"] = [
-            name.strip() for name in opts["only"].split(",") if name.strip()
-        ]
+        data["modules"] = normalize_modules(
+            [name.strip() for name in opts["only"].split(",") if name.strip()]
+        )
     elif opts["all"]:
         data["modules"] = list(ALL_FIELDS)
     path = config_path()
@@ -1367,6 +1545,7 @@ VALUE_OPTIONS = {
     "--width": "width",
     "--color": "color_mode",
     "--theme": "theme",
+    "--preset": "preset",
     "--only": "only",
     "--image": "image",
     "--image-file": "image",
@@ -1398,6 +1577,8 @@ FLAG_OPTIONS = {
     "--list-logos": "list_logos",
     "--list-fields": "list_fields",
     "--list-image-modes": "list_image_modes",
+    "--list-presets": "list_presets",
+    "--doctor": "doctor",
     "--all": "all",
     "--no-cache": "no_cache",
     "--no-network": "no_network",
@@ -1416,6 +1597,7 @@ def parse_args(argv):
         "color": color_enabled(),
         "color_mode": "auto",
         "theme": "default",
+        "preset": None,
         "compact": False,
         "ascii": False,
         "width": None,
@@ -1423,6 +1605,8 @@ def parse_args(argv):
         "list_logos": False,
         "list_fields": False,
         "list_image_modes": False,
+        "list_presets": False,
+        "doctor": False,
         "json": False,
         "only": None,
         "all": False,
@@ -1468,6 +1652,8 @@ def parse_args(argv):
             fail(f"unknown image position: {value}")
         elif key == "bar_style" and value not in BAR_STYLES:
             fail(f"unknown bar style: {value}")
+        elif key == "preset" and value not in PRESETS:
+            fail(f"unknown preset: {value} (use {', '.join(PRESETS)})")
         elif key == "format" and value not in (
             "text",
             "json",
@@ -1516,6 +1702,51 @@ def parse_args(argv):
         i += 1
 
     return opts
+
+
+def apply_preset(opts):
+    preset = PRESETS.get(opts["preset"])
+    if not preset:
+        return opts
+    merged = dict(opts)
+    for key, value in preset.items():
+        if key == "modules":
+            merged["only"] = ",".join(value)
+            merged["all"] = False
+        elif key == "logo":
+            merged["logo"] = value != "none"
+            merged["logo_name"] = value
+            merged["logo_file"] = None
+        else:
+            merged[key] = value
+    return merged
+
+
+def doctor_report():
+    module = load_image_module()
+    converters = {}
+    protocol = {}
+    if module is not None:
+        features = module.terminal_features()
+        converters = features.get("converters", {})
+        protocol = {"kitty": features.get("kitty"), "iterm": features.get("iterm")}
+    rows = [
+        ("version", VERSION),
+        ("python", platform.python_version()),
+        ("platform", platform.platform()),
+        ("terminal", os.environ.get("TERM", "?")),
+        ("colorterm", os.environ.get("COLORTERM", "?")),
+        ("truecolor", str(truecolor_available()).lower()),
+        ("tty", str(sys.stdout.isatty()).lower()),
+        ("config", str(config_path())),
+        ("cache", str(cache_dir())),
+        ("image_module", "ok" if module is not None else "missing"),
+    ]
+    for name, ok in protocol.items():
+        rows.append((f"protocol.{name}", str(bool(ok)).lower()))
+    for name, ok in converters.items():
+        rows.append((f"converter.{name}", str(bool(ok)).lower()))
+    return rows
 
 
 def render_image_lines(opts, data):
@@ -1583,7 +1814,15 @@ def main(argv=None):
 
     simple = any(
         opts[key]
-        for key in ("help", "version", "list_logos", "list_fields", "list_image_modes")
+        for key in (
+            "help",
+            "version",
+            "list_logos",
+            "list_fields",
+            "list_image_modes",
+            "list_presets",
+            "doctor",
+        )
     )
     if not simple:
         opts = parse_args(config_args() + list(argv))
@@ -1592,10 +1831,15 @@ def main(argv=None):
         item in ("--only", "-o") or item.startswith("--only=") for item in argv
     )
     cli_all = "--all" in argv
+    cli_preset = any(item == "--preset" or item.startswith("--preset=") for item in argv)
     if cli_only and not cli_all:
         opts["all"] = False
     if cli_all and not cli_only:
         opts["only"] = None
+    if cli_preset:
+        opts = apply_preset(opts)
+    elif opts["preset"] and opts["only"] is None and not opts["all"]:
+        opts = apply_preset(opts)
 
     if opts["theme"] not in THEME_NAMES:
         fail(f"unknown theme: {opts['theme']} (use {', '.join(THEME_NAMES)})")
@@ -1618,6 +1862,17 @@ def main(argv=None):
 
     if opts["list_image_modes"]:
         print("\n".join(IMAGE_MODES))
+        return 0
+
+    if opts["list_presets"]:
+        for name, preset in PRESETS.items():
+            modules = ",".join(preset.get("modules", ["*"]))
+            print(f"{name}: {modules}")
+        return 0
+
+    if opts["doctor"]:
+        for key, value in doctor_report():
+            print(f"{key}: {value}")
         return 0
 
     accent = parse_color(opts["accent"]) if opts["accent"] else None
@@ -1643,13 +1898,10 @@ def main(argv=None):
     if opts["all"]:
         fields = list(ALL_FIELDS)
     elif opts["only"] is not None:
-        fields = [name.strip().lower() for name in opts["only"].split(",")]
-        fields = [name for name in fields if name]
-        if not fields:
+        raw = [name.strip() for name in opts["only"].split(",") if name.strip()]
+        if not raw:
             fail("--only needs at least one field")
-        unknown = [name for name in fields if name not in ALL_FIELDS]
-        if unknown:
-            fail(f"unknown field: {', '.join(unknown)}")
+        fields = normalize_modules(raw)
     elif opts["oneline"] or opts["format"] == "oneline":
         fields = ["user", "host", "os", "kernel", "ram", "disk"]
     else:
@@ -1661,11 +1913,18 @@ def main(argv=None):
         ]
 
     started = time.perf_counter()
-    data = collect(fields, cache_ttl=opts["cache_ttl"], use_cache=not opts["no_cache"])
+    data, timings = collect(
+        fields, cache_ttl=opts["cache_ttl"], use_cache=not opts["no_cache"]
+    )
     if opts["timing"]:
         elapsed = (time.perf_counter() - started) * 1000
+        slowest = ", ".join(
+            f"{field_label(key)}={timings[key]:.0f}ms"
+            for key in sorted(timings, key=timings.get, reverse=True)[:3]
+        )
+        suffix = f" slowest: {slowest}" if slowest else ""
         print(
-            f"nullfetch: {len(fields)} fields in {elapsed:.1f} ms",
+            f"nullfetch: {len(fields)} fields in {elapsed:.1f} ms{suffix}",
             file=sys.stderr,
         )
 
