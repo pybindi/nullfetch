@@ -1,58 +1,33 @@
 #!/bin/sh
-# Build a .deb package from the current source tree.
 set -eu
 
-cd "$(dirname "$0")/.."
+version=$(grep '^version' Cargo.toml | head -n1 | sed 's/.*"\(.*\)".*/\1/')
+if [ -z "$version" ]; then echo "cannot read version" >&2; exit 1; fi
 
-version=$(sed -n 's/^VERSION = "\(.*\)"$/\1/p' nullfetch.py)
-if [ -z "$version" ]; then
-    echo "cannot read VERSION from nullfetch.py" >&2
-    exit 1
-fi
+arch=$(dpkg --print-architecture 2>/dev/null || echo amd64)
+pkg="build/nullfetch_${version}_${arch}"
+rm -rf "$pkg"
+mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/share/doc/nullfetch" "$pkg/usr/share/man/man1" \
+  "$pkg/usr/share/bash-completion/completions" "$pkg/usr/share/zsh/vendor-completions" "$pkg/usr/share/fish/vendor_completions.d"
 
-root=$(mktemp -d)
-trap 'rm -rf "$root"' EXIT
+cargo build --release --locked
+install -m755 target/release/nullfetch "$pkg/usr/bin/nullfetch"
+install -m644 README.md "$pkg/usr/share/doc/nullfetch/README.md"
+install -m644 nullfetch.1 "$pkg/usr/share/man/man1/nullfetch.1"
+install -m644 scripts/completions/nullfetch.bash "$pkg/usr/share/bash-completion/completions/nullfetch"
+install -m644 scripts/completions/nullfetch.zsh "$pkg/usr/share/zsh/vendor-completions/_nullfetch"
+install -m644 scripts/completions/nullfetch.fish "$pkg/usr/share/fish/vendor_completions.d/nullfetch.fish"
 
-pkg="$root/nullfetch"
-mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/share/doc/nullfetch" \
-    "$pkg/usr/share/nullfetch" "$pkg/usr/share/man/man1" \
-    "$pkg/usr/share/bash-completion/completions" \
-    "$pkg/usr/share/zsh/site-functions" \
-    "$pkg/usr/share/fish/vendor_completions.d"
-
-install -Dm755 nullfetch.py "$pkg/usr/bin/nullfetch"
-install -Dm644 logos.py "$pkg/usr/share/nullfetch/logos.py"
-install -Dm644 nullfetch_image.py "$pkg/usr/share/nullfetch/nullfetch_image.py"
-install -Dm644 nullfetch.bat "$pkg/usr/share/nullfetch/nullfetch.bat"
-install -Dm644 scripts/completions/nullfetch.bash \
-    "$pkg/usr/share/bash-completion/completions/nullfetch"
-install -Dm644 scripts/completions/_nullfetch \
-    "$pkg/usr/share/zsh/site-functions/_nullfetch"
-install -Dm644 scripts/completions/nullfetch.fish \
-    "$pkg/usr/share/fish/vendor_completions.d/nullfetch.fish"
-install -Dm644 README.md "$pkg/usr/share/doc/nullfetch/README.md"
-install -Dm644 debian/copyright "$pkg/usr/share/doc/nullfetch/copyright"
-gzip -9n -c nullfetch.1 >"$pkg/usr/share/man/man1/nullfetch.1.gz"
-
-size=$(du -sk "$pkg" | cut -f1)
-
-cat >"$pkg/DEBIAN/control" <<EOF
+cat > "$pkg/DEBIAN/control" <<EOF
 Package: nullfetch
 Version: $version
 Section: utils
 Priority: optional
-Architecture: all
-Depends: python3
-Recommends: pciutils
-Installed-Size: $size
+Architecture: $arch
 Maintainer: pybindi <sungunboom@gmail.com>
-Homepage: https://github.com/pybindi/nullfetch
-Description: tiny system fetch for Linux written in Python
- nullfetch prints system information next to an ASCII logo using only
- the Python standard library.
+Description: fast system fetch tool
+ A fast system information tool for Linux terminals, written in Rust.
 EOF
 
 mkdir -p dist
-dpkg-deb --build --root-owner-group "$pkg" "dist/nullfetch_${version}_all.deb"
-sha256sum "dist/nullfetch_${version}_all.deb" >"dist/SHA256SUMS"
-echo "dist/nullfetch_${version}_all.deb"
+dpkg-deb --build --root-owner-group "$pkg" "dist/nullfetch_${version}_${arch}.deb"

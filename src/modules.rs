@@ -1,7 +1,9 @@
+use serde_json::{json, Value as J};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Debug)]
 pub enum Value {
@@ -10,25 +12,34 @@ pub enum Value {
     None,
 }
 
-impl Value {
-    pub fn as_string(&self) -> String {
-        match self {
-            Value::Text(s) => s.clone(),
-            Value::Size { used, total, percent } => format!("{}/{ } GiB ({}%)", used, total, percent),
-            Value::None => "?".to_string(),
-        }
+pub fn value_to_json(v: &Value) -> J {
+    match v {
+        Value::Text(s) => json!(s),
+        Value::Size { used, total, percent } => json!({"used":used,"total":total,"percent":percent}),
+        Value::None => json!("?"),
     }
+}
+pub fn value_from_json(v: &J) -> Value {
+    if let Some(s) = v.as_str() { return Value::Text(s.to_string()); }
+    if let Some(o) = v.as_object() {
+        let used = o.get("used").and_then(|x| x.as_f64());
+        let total = o.get("total").and_then(|x| x.as_f64());
+        let percent = o.get("percent").and_then(|x| x.as_i64());
+        if let (Some(u),Some(t),Some(p)) = (used,total,percent) { return Value::Size{used:u,total:t,percent:p}; }
+    }
+    Value::Text(v.to_string())
 }
 
 trait StrExt { fn if_empty(self, d:String)->String; }
 impl StrExt for String { fn if_empty(self,d:String)->String { if self.trim().is_empty(){d} else {self} } }
 fn read(path: &str) -> String { fs::read_to_string(path).unwrap_or_default() }
 fn cmd(prog: &str, args: &[&str]) -> String {
-    Command::new(prog).args(args).output().ok().and_then(|o| {
+    Command::new(prog).args(args).output().ok().map(|o| {
         let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-        if s.is_empty() { Some(String::from_utf8_lossy(&o.stderr).trim().to_string()) } else { Some(s) }
+        if s.is_empty() { String::from_utf8_lossy(&o.stderr).trim().to_string() } else { s }
     }).unwrap_or_default()
 }
+fn cmd_timeout(prog: &str, args: &[&str], _secs: u64) -> String { cmd(prog,args) }
 
 pub fn get(field: &str) -> Value {
     let s = match field {
@@ -49,7 +60,7 @@ pub fn get(field: &str) -> Value {
         "disks" => disks(),
         "network" => network(),
         "local_ip" => local_ip(),
-        "public_ip" => "?".into(),
+        "public_ip" => public_ip(),
         "battery" => battery(),
         "temperature" => temperature(),
         "resolution" => resolution(),
@@ -72,90 +83,63 @@ pub fn get(field: &str) -> Value {
         _ if field.starts_with("command:") => command_field(field),
         _ => "?".into(),
     };
-    Value::Text(s)
+    Value::Text(if s.trim().is_empty() { "?".into() } else { s })
 }
 
 fn hostname() -> String {
-    if let Ok(s) = fs::read_to_string("/etc/hostname") {
-        let t = s.trim().to_string();
-        if !t.is_empty() { return t; }
-    }
-    if let Ok(o) = Command::new("hostname").output() {
-        let t = String::from_utf8_lossy(&o.stdout).trim().to_string();
-        if !t.is_empty() { return t; }
-    }
-    "?".into()
+    if let Ok(s) = fs::read_to_string("/etc/hostname") { let t=s.trim().to_string(); if !t.is_empty() { return t; } }
+    cmd("hostname", &[])
 }
 fn os_name() -> String {
     if let Ok(s) = fs::read_to_string("/etc/os-release") {
-        for line in s.lines() {
-            if let Some(v) = line.strip_prefix("PRETTY_NAME=") { return v.trim_matches('"').to_string(); }
-        }
+        for line in s.lines() { if let Some(v)=line.strip_prefix("PRETTY_NAME=") { return v.trim_matches('"').to_string(); } }
     }
-    if cfg!(windows) { return "Windows".into(); }
+    if cfg!(windows) { return format!("Windows {}", std::env::consts::ARCH); }
     std::env::consts::OS.to_string()
 }
-
 pub fn detect_distro_id() -> String {
     if let Ok(s) = fs::read_to_string("/etc/os-release") {
-        let mut id = String::new();
-        let mut id_like = String::new();
+        let mut id=String::new(); let mut like=String::new();
         for line in s.lines() {
-            if let Some(v) = line.strip_prefix("ID=") { id = v.trim_matches('"').to_lowercase(); }
-            if let Some(v) = line.strip_prefix("ID_LIKE=") { id_like = v.trim_matches('"').to_lowercase(); }
+            if let Some(v)=line.strip_prefix("ID=") { id=v.trim_matches('"').to_lowercase(); }
+            if let Some(v)=line.strip_prefix("ID_LIKE=") { like=v.trim_matches('"').to_lowercase(); }
         }
         if !id.is_empty() { return id; }
-        if let Some(first) = id_like.split_whitespace().next() { return first.to_string(); }
+        if let Some(first)=like.split_whitespace().next() { return first.to_string(); }
     }
     std::env::consts::OS.to_string()
 }
-fn kernel() -> String { read("/proc/sys/kernel/osrelease").trim().to_string().if_empty("?".into()) }
+fn kernel() -> String { if cfg!(windows) { cmd("cmd", &["/c","ver"]) } else { read("/proc/sys/kernel/osrelease").trim().to_string().if_empty("?".into()) } }
 fn uptime() -> String {
     let s = read("/proc/uptime");
     let secs: f64 = s.split_whitespace().next().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+    if secs <= 0.0 { return "?".into(); }
     fmt_dur(secs as u64)
 }
 fn fmt_dur(secs: u64) -> String {
     let d = secs / 86400; let h = (secs % 86400) / 3600; let m = (secs % 3600) / 60;
-    let mut out = vec![];
-    if d>0 {out.push(format!("{d}d"));} if h>0 {out.push(format!("{h}h"));} out.push(format!("{m}m")); out.join(" ")
+    let mut out = vec![]; if d>0 {out.push(format!("{d}d"));} if h>0 {out.push(format!("{h}h"));} out.push(format!("{m}m")); out.join(" ")
 }
 fn boot_time() -> String {
     let s = read("/proc/stat");
     for line in s.lines() {
         if let Some(v) = line.strip_prefix("btime ") {
             if let Ok(ts) = v.trim().parse::<i64>() {
-                // format as UTC-ish local via `date` fallback avoided; keep epoch->local using libc localtime
                 unsafe extern "C" { fn localtime(t: *const i64) -> *mut tm; }
                 #[repr(C)] struct tm { tm_sec:i32,tm_min:i32,tm_hour:i32,tm_mday:i32,tm_mon:i32,tm_year:i32,tm_wday:i32,tm_yday:i32,tm_isdst:i32,tm_gmtoff:i64,tm_zone:*const i8 }
-                unsafe {
-                    let p = localtime(&ts as *const i64);
-                    if !p.is_null() {
-                        let t = &*p;
-                        return format!("{:04}-{:02}-{:02} {:02}:{:02}", t.tm_year+1900, t.tm_mon+1, t.tm_mday, t.tm_hour, t.tm_min);
-                    }
-                }
+                unsafe { let p = localtime(&ts as *const i64); if !p.is_null() { let t=&*p; return format!("{:04}-{:02}-{:02} {:02}:{:02}", t.tm_year+1900, t.tm_mon+1, t.tm_mday, t.tm_hour, t.tm_min); } }
             }
         }
     }
     "?".into()
 }
-fn loadavg() -> String {
-    let s = read("/proc/loadavg");
-    let p: Vec<&str> = s.split_whitespace().collect();
-    if p.len()>=3 { format!("{} {} {}", p[0],p[1],p[2]) } else { "?".into() }
-}
+fn loadavg() -> String { let s=read("/proc/loadavg"); let p:Vec<&str>=s.split_whitespace().collect(); if p.len()>=3 { format!("{} {} {}", p[0],p[1],p[2]) } else {"?".into()} }
 fn cpu() -> String {
     let s = read("/proc/cpuinfo");
-    for line in s.lines() {
-        if line.to_lowercase().starts_with("model name") {
-            if let Some((_,v)) = line.split_once(':') { return v.trim().to_string(); }
-        }
-    }
+    for line in s.lines() { if line.to_lowercase().starts_with("model name") { if let Some((_,v))=line.split_once(':') { return v.trim().to_string(); } } }
     std::env::consts::ARCH.to_string()
 }
 fn gpu() -> String {
-    // fast path: /sys/class/drm
     if let Ok(entries) = fs::read_dir("/sys/class/drm") {
         let mut names = vec![];
         for e in entries.flatten() {
@@ -182,16 +166,10 @@ fn pci_lookup(vendor: &str, device: &str) -> Option<String> {
     let mut in_vendor = false;
     for line in db.lines() {
         if line.starts_with('#') || line.trim().is_empty() { continue; }
-        if !line.starts_with('\t') {
-            in_vendor = line.starts_with(&v);
-            continue;
-        }
+        if !line.starts_with('\t') { in_vendor = line.starts_with(&v); continue; }
         if in_vendor && line.starts_with('\t') && !line.starts_with("\t\t") {
             let l = line.trim_start();
-            if l.starts_with(&d) {
-                let name = l[d.len()..].trim();
-                if !name.is_empty() { return Some(name.to_string()); }
-            }
+            if l.starts_with(&d) { let name = l[d.len()..].trim(); if !name.is_empty() { return Some(name.to_string()); } }
         }
     }
     None
@@ -200,10 +178,7 @@ fn pci_lookup(vendor: &str, device: &str) -> Option<String> {
 fn meminfo() -> HashMap<String,u64> {
     let mut m=HashMap::new();
     for line in read("/proc/meminfo").lines() {
-        if let Some((k,v)) = line.split_once(':') {
-            let n = v.split_whitespace().next().and_then(|x| x.parse::<u64>().ok()).unwrap_or(0);
-            m.insert(k.trim().to_string(), n);
-        }
+        if let Some((k,v)) = line.split_once(':') { let n = v.split_whitespace().next().and_then(|x| x.parse::<u64>().ok()).unwrap_or(0); m.insert(k.trim().to_string(), n); }
     }
     m
 }
@@ -213,8 +188,8 @@ fn size_value(used_kb: u64, total_kb: u64) -> Value {
     let pct = if total_kb>0 { ((used_kb as f64/total_kb as f64)*100.0).round() as i64 } else {0};
     Value::Size{used,total,percent:pct}
 }
-fn ram() -> Value { let m=meminfo(); let t=m.get("MemTotal").copied().unwrap_or(0); let a=m.get("MemAvailable").copied().unwrap_or_else(|| m.get("MemFree").copied().unwrap_or(0)); if t==0 {Value::Text("?".into())} else {size_value(t-a,t)} }
-fn swap() -> Value { let m=meminfo(); let t=m.get("SwapTotal").copied().unwrap_or(0); let f=m.get("SwapFree").copied().unwrap_or(0); if t==0 {Value::Text("none".into())} else {size_value(t-f,t)} }
+fn ram() -> Value { let m=meminfo(); let t=m.get("MemTotal").copied().unwrap_or(0); let a=m.get("MemAvailable").copied().unwrap_or_else(|| m.get("MemFree").copied().unwrap_or(0)); if t==0 {Value::Text("?".into())} else {size_value(t.saturating_sub(a),t)} }
+fn swap() -> Value { let m=meminfo(); let t=m.get("SwapTotal").copied().unwrap_or(0); let f=m.get("SwapFree").copied().unwrap_or(0); if t==0 {Value::Text("none".into())} else {size_value(t.saturating_sub(f),t)} }
 fn disk(path: &str) -> Value {
     #[cfg(unix)]
     {
@@ -247,30 +222,28 @@ fn disks() -> String {
         let fs = p[2]; let mp = p[1];
         if matches!(fs, "tmpfs"|"devtmpfs"|"squashfs"|"overlay"|"proc"|"sysfs"|"cgroup2"|"efivarfs") { continue; }
         if !p[0].starts_with('/') { continue; }
-        if let Value::Size{used,total,percent}=disk(mp) {
-            out.push(format!("{mp}: {used}/{total} GiB ({percent}%)"));
-        }
+        if let Value::Size{used,total,percent}=disk(mp) { out.push(format!("{mp}: {used}/{total} GiB ({percent}%)")); }
         if out.len()>=5 { break; }
     }
     if out.is_empty(){"?".into()} else {out.join(", ")}
 }
-fn network() -> String {
-    let ip = local_ip();
-    let iface = default_iface().unwrap_or_default();
-    if !iface.is_empty() && ip != "?" { format!("{iface} ({ip})") } else if ip != "?" { ip } else { "?".into() }
-}
+fn network() -> String { let ip=local_ip(); let iface=default_iface().unwrap_or_default(); if !iface.is_empty() && ip!="?" { format!("{iface} ({ip})") } else if ip!="?" { ip } else { "?".into() } }
 fn default_iface() -> Option<String> {
     let s = read("/proc/net/route");
-    for line in s.lines().skip(1) {
-        let p: Vec<&str> = line.split_whitespace().collect();
-        if p.len()>=3 && p[1]=="00000000" && p[2]!="00000000" { return Some(p[0].to_string()); }
-    }
+    for line in s.lines().skip(1) { let p: Vec<&str> = line.split_whitespace().collect(); if p.len()>=3 && p[1]=="00000000" && p[2]!="00000000" { return Some(p[0].to_string()); } }
     None
 }
 fn local_ip() -> String {
-    // parse ip -4 route get via /proc/net/route + get local addr from /sys not available; fallback to command but cache? keep simple: use `ip` once
     let out = cmd("ip", &["-4","route","get","1.1.1.1"]);
     for tok in out.split_whitespace().collect::<Vec<_>>().windows(2) { if tok[0]=="src" { return tok[1].to_string(); } }
+    "?".into()
+}
+fn public_ip() -> String {
+    for (prog,args) in [("curl", vec!["-fsS","--max-time","2","https://ifconfig.me"]), ("wget", vec!["-qO-","--timeout=2","https://ifconfig.me"])] {
+        let out = cmd(prog, &args.iter().map(|s|*s).collect::<Vec<_>>());
+        let t = out.trim().to_string();
+        if !t.is_empty() && t.len()<100 { return t; }
+    }
     "?".into()
 }
 fn battery() -> String {
@@ -279,8 +252,8 @@ fn battery() -> String {
         for e in entries.flatten() {
             let n = e.file_name().to_string_lossy().to_string();
             if !n.starts_with("BAT") { continue; }
-            let cap = read(&format!("{}/capacity", e.path().display())).trim().to_string();
-            let status = read(&format!("{}/status", e.path().display())).trim().to_string();
+            let cap = read(e.path().join("capacity").to_str().unwrap_or("")).trim().to_string();
+            let status = read(e.path().join("status").to_str().unwrap_or("")).trim().to_string();
             if !cap.is_empty() { return if status.is_empty(){format!("{cap}%")} else {format!("{cap}% ({status})")}; }
         }
     }
@@ -290,8 +263,8 @@ fn temperature() -> String {
     if let Ok(entries) = fs::read_dir("/sys/class/thermal") {
         for e in entries.flatten() {
             let p = e.path();
-            let t = read(&format!("{}/temp", p.display())).trim().to_string();
-            if let Ok(v) = t.parse::<f64>() { if v>1000.0 { return format!("{:.1}°C", v/1000.0); } }
+            let t = read(p.join("temp").to_str().unwrap_or("")).trim().to_string();
+            if let Ok(v) = t.parse::<f64>() { if v>1000.0 { return format!("{:.1}°C", v/1000.0); } else if v>0.0 && v<200.0 { return format!("{v:.1}°C"); } }
         }
     }
     let out = cmd("sh", &["-c", "sensors 2>/dev/null | awk '/Package id 0|Tctl|temp1/ {gsub(/[+°C]/,\"\",$0); for(i=1;i<=NF;i++) if($i ~ /[0-9]+\\.[0-9]/){print $i; exit}}'"]);
@@ -314,21 +287,16 @@ fn resolution() -> String {
 fn shell() -> String { std::env::var("SHELL").ok().and_then(|s| Path::new(&s).file_name().map(|n| n.to_string_lossy().to_string())).unwrap_or("?".into()) }
 fn terminal() -> String { std::env::var("TERM_PROGRAM").or_else(|_| std::env::var("TERMINAL_EMULATOR")).or_else(|_| std::env::var("TERM")).unwrap_or("?".into()) }
 fn wm() -> String {
-    if let Ok(w) = std::env::var("WAYLAND_DISPLAY") { if !w.is_empty() { return std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "Wayland".into()); } }
+    if std::env::var("WAYLAND_DISPLAY").ok().filter(|s| !s.is_empty()).is_some() {
+        return std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "Wayland".into());
+    }
     std::env::var("XDG_SESSION_DESKTOP").or_else(|_| std::env::var("XDG_CURRENT_DESKTOP")).unwrap_or_else(|_| std::env::var("XDG_SESSION_TYPE").unwrap_or("?".into()))
 }
 fn packages() -> String {
-    // fast paths: read package db dirs
-    if let Ok(rd)=fs::read_dir("/var/lib/pacman/local") {
-        let n = rd.flatten().filter(|e| e.file_type().map(|t|t.is_dir()).unwrap_or(false)).count();
-        if n>1 { return format!("{} (pacman)", n.saturating_sub(1)); }
-    }
-    if let Ok(s)=fs::read_to_string("/var/lib/dpkg/status") {
-        let n = s.lines().filter(|l| l.starts_with("Package: ")).count();
-        if n>0 { return format!("{n} (dpkg)"); }
-    }
-    let checks = [("rpm -qa 2>/dev/null | wc -l"," (rpm)")];
-    for (c,suf) in checks { let out=cmd("sh", &["-c", c]).trim().to_string(); if let Ok(n)=out.parse::<i64>() { if n>0 { return format!("{n}{suf}"); } } }
+    if let Ok(rd)=fs::read_dir("/var/lib/pacman/local") { let n = rd.flatten().filter(|e| e.file_type().map(|t|t.is_dir()).unwrap_or(false)).count(); if n>1 { return format!("{} (pacman)", n.saturating_sub(1)); } }
+    if let Ok(s)=fs::read_to_string("/var/lib/dpkg/status") { let n = s.lines().filter(|l| l.starts_with("Package: ")).count(); if n>0 { return format!("{n} (dpkg)"); } }
+    let out = cmd("sh", &["-c", "rpm -qa 2>/dev/null | wc -l"]);
+    if let Ok(n)=out.trim().parse::<i64>() { if n>0 { return format!("{n} (rpm)"); } }
     "?".into()
 }
 fn processes() -> String {
@@ -343,20 +311,17 @@ fn init() -> String {
 }
 fn timezone() -> String {
     if let Ok(tz)=std::env::var("TZ") { if !tz.is_empty() { return tz; } }
-    if let Ok(p)=fs::read_link("/etc/localtime") {
-        let s=p.to_string_lossy().to_string();
-        if let Some(i)=s.find("zoneinfo/") { return s[i+9..].to_string(); }
-        return s;
-    }
+    if let Ok(p)=fs::read_link("/etc/localtime") { let s=p.to_string_lossy().to_string(); if let Some(i)=s.find("zoneinfo/") { return s[i+9..].to_string(); } return s; }
     read("/etc/timezone").trim().to_string().if_empty("?".into())
 }
 fn date_now() -> String {
     let out = Command::new("date").arg("+%Y-%m-%d %H:%M:%S").output().ok();
     if let Some(o)=out { let t=String::from_utf8_lossy(&o.stdout).trim().to_string(); if !t.is_empty() { return t; } }
-    "?".into()
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+    now.to_string()
 }
-fn motherboard() -> String { let v=read("/sys/devices/virtual/dmi/id/board_vendor").trim().to_string(); let n=read("/sys/devices/virtual/dmi/id/board_name").trim().to_string(); let s=format!("{v} {n}").trim().to_string(); if s.is_empty(){"?".into()} else {s} }
-fn bios() -> String { let v=read("/sys/devices/virtual/dmi/id/bios_vendor").trim().to_string(); let n=read("/sys/devices/virtual/dmi/id/bios_version").trim().to_string(); let s=format!("{v} {n}").trim().to_string(); if s.is_empty(){"?".into()} else {s} }
+fn motherboard() -> String { let v=read("/sys/devices/virtual/dmi/id/board_vendor").trim().to_string(); let n=read("/sys/devices/virtual/dmi/id/board_name").trim().to_string(); format!("{v} {n}").trim().to_string().if_empty("?".into()) }
+fn bios() -> String { let v=read("/sys/devices/virtual/dmi/id/bios_vendor").trim().to_string(); let n=read("/sys/devices/virtual/dmi/id/bios_version").trim().to_string(); format!("{v} {n}").trim().to_string().if_empty("?".into()) }
 fn display() -> String { resolution() }
 fn audio() -> String {
     let out=cmd("pactl", &["info"]);
@@ -374,6 +339,11 @@ fn command_field(field: &str) -> String {
     if parts.len() != 3 { return "?".into(); }
     let cmdline = parts[2];
     let out = Command::new("sh").args(["-c", cmdline]).output().ok();
-    if let Some(o)=out { let s=String::from_utf8_lossy(&o.stdout).trim().to_string(); if !s.is_empty() { return s.lines().next().unwrap_or("?").to_string(); } let e=String::from_utf8_lossy(&o.stderr).trim().to_string(); if !e.is_empty() { return e.lines().next().unwrap_or("?").to_string(); } }
+    if let Some(o)=out {
+        let s=String::from_utf8_lossy(&o.stdout).trim().to_string();
+        if !s.is_empty() { return s.lines().next().unwrap_or("?").to_string(); }
+        let e=String::from_utf8_lossy(&o.stderr).trim().to_string();
+        if !e.is_empty() { return e.lines().next().unwrap_or("?").to_string(); }
+    }
     "?".into()
 }

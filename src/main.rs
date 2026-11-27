@@ -1,11 +1,13 @@
+mod cache;
 mod config;
+mod image;
 mod logos;
 mod modules;
 mod render;
 
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
@@ -16,6 +18,15 @@ const ALL_FIELDS: &[&str] = &["user","host","os","kernel","arch","uptime","boot_
 const EXTRA_FIELDS: &[&str] = &["arch","uptime","boot_time","loadavg","cpu_cores","swap","disks","network","local_ip","public_ip","battery","temperature","resolution","shell","terminal","de","wm","packages","processes","init","locale","timezone","date","motherboard","bios","display","audio","bluetooth","power"];
 const IMAGE_MODES: &[&str] = &["auto","blocks","ascii","kitty","iterm","chafa","viu","jp2","img2txt","timg","sixel"];
 const THEMES: &[&str] = &["default","mono","light","neon","dark","nord","gruvbox","dracula","tokyo","solarized","matrix"];
+const PRESETS: &[(&str, &[&str])] = &[
+    ("minimal", &["os","kernel","cpu","ram"]),
+    ("full", &[]),
+    ("dev", &["os","kernel","shell","terminal","de","wm","cpu","ram","disk","packages","processes","init"]),
+    ("server", &["host","os","kernel","uptime","loadavg","cpu","ram","disk","network","local_ip","processes","init"]),
+];
+const SLOW_FIELDS: &[&str] = &["public_ip","packages","resolution","temperature","battery","audio","bluetooth","display"];
+
+fn is_slow(field: &str) -> bool { field.starts_with("command:") || SLOW_FIELDS.contains(&field) }
 
 fn label(key: &str) -> String {
     if key.starts_with("command:") {
@@ -58,7 +69,17 @@ impl Default for Opts {
     }
 }
 
-fn fail(msg: &str) -> ! { eprintln!("nullfetch: {msg}\ntry 'nullfetch --help'"); std::process::exit(2); }
+fn fail(msg: &str) -> ! {
+    eprintln!("nullfetch: {msg}");
+    eprintln!("try 'nullfetch --help'");
+    std::process::exit(2);
+}
+
+fn parse_u(text:&str,name:&str,min:usize)->usize {
+    let n = text.parse::<usize>().unwrap_or_else(|_| fail(&format!("invalid {name}: {text}")));
+    if n < min { fail(&format!("{name} must be at least {min}: {text}")); }
+    n
+}
 
 fn parse_args(args: &[String]) -> Opts {
     let mut o = Opts::default();
@@ -76,7 +97,7 @@ fn parse_args(args: &[String]) -> Opts {
             "-h"|"--help" => o.help=true,
             "--version" => o.version=true,
             "--no-logo" => { o.logo=false; o.logo_name="none".into(); },
-            "--logo" => { let v=take_val("--logo"); o.logo_name=v.clone(); o.logo=v!="none"; o.logo_file=None; },
+            "--logo" => { let v=take_val("--logo"); o.logo_name=v.clone(); o.logo=v!="none"; if v!="none" { o.logo_file=None; } },
             "--logo-file" => { o.logo_file=Some(take_val("--logo-file")); o.logo=true; },
             "--accent" => o.accent=Some(take_val("--accent")),
             "--color" => { let v=take_val("--color"); match v.as_str(){ "auto"=>{o.color=render::color_enabled(); o.color_mode="auto".into();}, "always"=>{o.color=true; o.color_mode="always".into();}, "never"=>{o.color=false; o.color_mode="never".into();}, _=>fail(&format!("invalid color mode: {v}")) } },
@@ -97,15 +118,15 @@ fn parse_args(args: &[String]) -> Opts {
             "--all" => o.all=true,
             "--image"|"--image-file" => o.image=Some(take_val("--image")),
             "--image-mode" => { let v=take_val("--image-mode"); if !IMAGE_MODES.contains(&v.as_str()) { fail(&format!("unknown image mode: {v}")); } o.image_mode=v; },
-            "--image-width" => o.image_width=take_val("--image-width").parse().ok(),
-            "--image-height" => o.image_height=take_val("--image-height").parse().ok(),
+            "--image-width" => o.image_width=Some(parse_u(&take_val("--image-width"), "image-width", 1)),
+            "--image-height" => o.image_height=Some(parse_u(&take_val("--image-height"), "image-height", 1)),
             "--image-position" => { let v=take_val("--image-position"); if !["side","top","bottom"].contains(&v.as_str()) { fail(&format!("unknown image position: {v}")); } o.image_position=v; },
             "--image-bg" => o.image_bg=Some(take_val("--image-bg")),
             "--separator" => o.separator=take_val("--separator"),
-            "--bar-width" => o.bar_width=take_val("--bar-width").parse().unwrap_or(12),
+            "--bar-width" => o.bar_width=parse_u(&take_val("--bar-width"), "bar-width", 1),
             "--bar-style" => { let v=take_val("--bar-style"); if !["blocks","ascii","arrows","dots","lines"].contains(&v.as_str()) { fail(&format!("unknown bar style: {v}")); } o.bar_style=v; },
             "--format" => { let v=take_val("--format"); if !["text","json","csv","markdown","oneline"].contains(&v.as_str()) { fail(&format!("unknown format: {v}")); } o.format=v.clone(); if v=="json" {o.json=true;} },
-            "--cache-ttl" => o.cache_ttl=take_val("--cache-ttl").parse().unwrap_or(300),
+            "--cache-ttl" => { let v=take_val("--cache-ttl"); o.cache_ttl=v.parse::<i64>().unwrap_or_else(|_| fail(&format!("invalid cache-ttl: {v}"))); if o.cache_ttl<0 { fail(&format!("cache-ttl must be at least 0: {v}")); } },
             "--no-cache" => o.no_cache=true,
             "--no-network" => o.no_network=true,
             "--timing" => o.timing=true,
@@ -147,7 +168,16 @@ fn apply_preset(o: &mut Opts) {
     if let Some(m)=modules { o.only=Some(m.join(",")); o.all=false; }
 }
 
-fn collect(fields: &[String]) -> (BTreeMap<String, modules::Value>, std::collections::HashMap<String, f64>) {
+fn cache_name_for(field: &str) -> String {
+    if field.starts_with("command:") {
+        let cmd = field.splitn(3,':').nth(2).unwrap_or(field);
+        let mut h: u64 = 1469598103934665603;
+        for b in cmd.as_bytes() { h ^= *b as u64; h = h.wrapping_mul(1099511628211); }
+        format!("cmd-{}-{}", field.splitn(3,':').nth(1).unwrap_or("cmd"), h)
+    } else { field.to_string() }
+}
+
+fn collect(fields: &[String], cache_ttl: i64, use_cache: bool) -> (BTreeMap<String, modules::Value>, std::collections::HashMap<String, f64>) {
     let data: Arc<Mutex<BTreeMap<String, modules::Value>>> = Arc::new(Mutex::new(BTreeMap::new()));
     let timings: Arc<Mutex<std::collections::HashMap<String, f64>>> = Arc::new(Mutex::new(std::collections::HashMap::new()));
     let mut handles = vec![];
@@ -155,100 +185,153 @@ fn collect(fields: &[String]) -> (BTreeMap<String, modules::Value>, std::collect
         let data = data.clone(); let timings = timings.clone();
         handles.push(thread::spawn(move || {
             let t = Instant::now();
-            let v = modules::get(&f);
+            let ttl = if use_cache { if f.starts_with("command:") || is_slow(&f) { cache_ttl } else { 0 } } else { 0 };
+            let cname = cache_name_for(&f);
+            let v = if ttl > 0 {
+                if let Some(cached) = cache::read(&cname, ttl) {
+                    modules::value_from_json(&cached)
+                } else {
+                    let got = modules::get(&f);
+                    if !matches!(got, modules::Value::None) {
+                        cache::write(&cname, &modules::value_to_json(&got));
+                    }
+                    got
+                }
+            } else { modules::get(&f) };
             timings.lock().unwrap().insert(f.clone(), t.elapsed().as_secs_f64()*1000.0);
             data.lock().unwrap().insert(f, v);
         }));
     }
     for h in handles { let _ = h.join(); }
-    let data = data.lock().unwrap().clone();
-    let timings = timings.lock().unwrap().clone();
-    (data, timings)
+    (data.lock().unwrap().clone(), timings.lock().unwrap().clone())
 }
 
-fn find_python_cli() -> Option<std::path::PathBuf> {
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let p = dir.join("nullfetch.py");
-            if p.exists() { return Some(p); }
-            let share = dir.join("../share/nullfetch/nullfetch.py");
-            if share.exists() { return Some(share); }
-        }
-    }
-    for p in [
-        "/usr/share/nullfetch/nullfetch.py",
-        "/usr/local/share/nullfetch/nullfetch.py",
-    ] {
-        let pb = std::path::PathBuf::from(p);
-        if pb.exists() { return Some(pb); }
-    }
-    if let Ok(cwd) = std::env::current_dir() {
-        let p = cwd.join("nullfetch.py");
-        if p.exists() { return Some(p); }
-    }
-    None
-}
-
-fn delegate_to_python(args: &[String]) -> ! {
-    let Some(script) = find_python_cli() else {
-        fail("this feature needs Python nullfetch.py fallback, but it was not found");
-    };
-    let mut cmd = Command::new("python3");
-    cmd.arg(script).args(args);
-    let status = cmd.status().unwrap_or_else(|e| fail(&format!("cannot run python3 fallback: {e}")));
-    std::process::exit(status.code().unwrap_or(1));
-}
-
-fn get_logo(opts: &Opts) -> Vec<String> {
-    if !opts.logo || opts.logo_name=="none" { return vec![]; }
+fn get_logo(opts: &Opts) -> (Vec<String>, bool) {
+    if !opts.logo || opts.logo_name=="none" { return (vec![], false); }
     if let Some(path) = &opts.logo_file {
         let p = config::expand_path(path);
-        if let Ok(s)=std::fs::read_to_string(p) { return s.lines().map(|l| l.to_string()).collect(); }
-        return vec![];
+        match std::fs::read_to_string(&p) {
+            Ok(s) => {
+                if s.len() > 100_000 { fail("logo file is too large (maximum: 100 KiB)"); }
+                let lines: Vec<String> = s.lines().map(|l| l.to_string()).collect();
+                if lines.is_empty() { fail(&format!("logo file is empty: {}", p.display())); }
+                if lines.len() > 100 { fail("logo file has too many lines (maximum: 100)"); }
+                if lines.iter().any(|l| l.chars().count() > 2000) { fail("logo file has an overlong line (maximum: 2000 characters)"); }
+                return (lines, false);
+            }
+            Err(_) => fail(&format!("cannot read logo file: {}", p.display())),
+        }
     }
     let name = if opts.logo_name=="auto" { modules::detect_distro_id() } else { opts.logo_name.clone() };
     let map = logos::logos();
-    for (k,v) in &map { if *k == name { return v.lines().map(|l| l.to_string()).collect(); } }
+    if opts.logo_name != "auto" && !map.iter().any(|(k,_)| *k==name) && !logos::aliases().contains_key(name.as_str()) {
+        let mut names: Vec<&str> = map.iter().map(|(k,_)| *k).collect(); names.sort();
+        fail(&format!("unknown logo: {} (available: {})", opts.logo_name, names.join(", ")));
+    }
+    for (k,v) in &map { if *k == name { return (v.lines().map(|l| l.to_string()).collect(), false); } }
     let aliases = logos::aliases();
     if let Some(real)=aliases.get(name.as_str()) {
-        for (k,v) in &map { if k==real { return v.lines().map(|l| l.to_string()).collect(); } }
+        for (k,v) in &map { if k==real { return (v.lines().map(|l| l.to_string()).collect(), false); } }
     }
-    for (k,v) in &map { if *k == "linux" { return v.lines().map(|l| l.to_string()).collect(); } }
-    vec![]
+    for (k,v) in &map { if *k == "linux" { return (v.lines().map(|l| l.to_string()).collect(), false); } }
+    (vec![], false)
+}
+
+fn parse_bg(s: Option<&str>) -> [u8;3] {
+    let Some(v)=s else { return [0,0,0]; };
+    render::parse_hex_color(v).or_else(|| render::named_color(v)).map(|(r,g,b)| [r,g,b]).unwrap_or([0,0,0])
+}
+
+fn truncate_visible(s: &str, max: usize, ascii: bool) -> String {
+    let v = render::visible_len(s);
+    if v <= max { return s.to_string(); }
+    let ell = if ascii { "..." } else { "…" };
+    let ell_len = if ascii {3} else {1};
+    if max <= ell_len { return ell.chars().take(max).collect(); }
+    let target = max - ell_len;
+    let mut out = String::new();
+    let mut n = 0usize;
+    let mut chars = s.chars().peekable();
+    while let Some(c)=chars.next() {
+        if c=='\x1b' {
+            out.push(c);
+            if chars.peek()==Some(&'[') { out.push(chars.next().unwrap()); while let Some(&x)=chars.peek() { out.push(chars.next().unwrap()); if x.is_ascii_alphabetic() { break; } } }
+            continue;
+        }
+        if n >= target { break; }
+        out.push(c); n+=1;
+    }
+    out.push_str(ell);
+    out
 }
 
 fn render_text(fields: &[String], data: &BTreeMap<String, modules::Value>, opts: &Opts) {
     let accent = render::resolve_accent(opts.accent.as_deref(), &opts.theme);
-    let logo = get_logo(opts);
+    let (mut logo, precolored) = get_logo(opts);
     let info = render::render_info_lines(fields, data, opts.color, accent, &opts.separator, opts.bar_width, &opts.bar_style, opts.ascii, opts.compact);
+
+    if let Some(path)=&opts.image {
+        let (c,l)=image::image_dims(opts.image_width, opts.image_height);
+        match image::render(&opts.image_mode, path, c, l, parse_bg(opts.image_bg.as_deref())) {
+            Ok(img) => {
+                if opts.image_position=="top" {
+                    for l in &img.lines { println!("{}", truncate_visible(l, opts.width.unwrap_or(usize::MAX), opts.ascii)); }
+                    for l in &info { println!("{}", truncate_visible(l, opts.width.unwrap_or(usize::MAX), opts.ascii)); }
+                    return;
+                }
+                if opts.image_position=="bottom" {
+                    for l in &info { println!("{}", truncate_visible(l, opts.width.unwrap_or(usize::MAX), opts.ascii)); }
+                    for l in &img.lines { println!("{}", truncate_visible(l, opts.width.unwrap_or(usize::MAX), opts.ascii)); }
+                    return;
+                }
+                logo = img.lines;
+            }
+            Err(e)=>{ eprintln!("nullfetch: {e}"); std::process::exit(2); }
+        }
+    }
+
+    let width = opts.width.unwrap_or_else(|| term_width().0);
     if logo.is_empty() {
-        for l in info { println!("{l}"); }
+        for l in info { println!("{}", truncate_visible(&l, width, opts.ascii)); }
         return;
     }
     let logo_w = logo.iter().map(|l| render::visible_len(l)).max().unwrap_or(0);
     let gap = 2usize;
+    let stacked = width < logo_w + gap + 20;
+    if stacked {
+        for l in &logo { println!("{}", truncate_visible(l, width, opts.ascii)); }
+        if !opts.compact { println!(); }
+        for l in &info { println!("{}", truncate_visible(l, width, opts.ascii)); }
+        return;
+    }
+    let info_w = width.saturating_sub(logo_w + gap);
     let max_lines = logo.len().max(info.len());
     for i in 0..max_lines {
         let l = logo.get(i).map(|s| s.as_str()).unwrap_or("");
         let r = info.get(i).map(|s| s.as_str()).unwrap_or("");
         let lpad = render::pad_visible(l, logo_w);
-        if r.is_empty() { println!("{}", lpad.trim_end()); }
-        else { println!("{}{}{}", lpad, " ".repeat(gap), r); }
+        if r.is_empty() { println!("{}", truncate_visible(lpad.trim_end(), width, opts.ascii)); }
+        else { let r = truncate_visible(r, info_w, opts.ascii); println!("{}{}{}", lpad, " ".repeat(gap), r); }
     }
+}
+
+fn term_width() -> (usize, usize) {
+    std::process::Command::new("stty").args(["size"]).output().ok().and_then(|o| {
+        let s = String::from_utf8_lossy(&o.stdout);
+        let mut it = s.split_whitespace();
+        let rows = it.next()?.parse().ok()?;
+        let cols = it.next()?.parse().ok()?;
+        Some((cols, rows))
+    }).unwrap_or((80,24))
 }
 
 fn print_json(fields: &[String], data: &BTreeMap<String, modules::Value>) {
     let mut m = Map::new();
-    let use_default = fields == FIELDS;
-    let keys: Vec<String> = if use_default { FIELDS.iter().map(|s|s.to_string()).collect() } else { fields.to_vec() };
+    let default_only = fields.len()==FIELDS.len() && fields.iter().zip(FIELDS.iter()).all(|(a,b)| a==b);
+    let keys: Vec<String> = if default_only { FIELDS.iter().map(|s|s.to_string()).collect() } else { fields.to_vec() };
     for f in keys {
         let v = data.get(&f).cloned().unwrap_or(modules::Value::Text("?".into()));
-        let j = match v {
-            modules::Value::Size{used,total,percent} => json!({"used":used,"total":total,"percent":percent}),
-            modules::Value::Text(s) => json!(s),
-            modules::Value::None => json!("?"),
-        };
-        m.insert(f, j);
+        m.insert(f, modules::value_to_json(&v));
     }
     println!("{}", serde_json::to_string_pretty(&Value::Object(m)).unwrap());
 }
@@ -256,75 +339,89 @@ fn print_json(fields: &[String], data: &BTreeMap<String, modules::Value>) {
 fn print_csv(fields: &[String], data: &BTreeMap<String, modules::Value>) {
     println!("field,value");
     for f in fields {
-        let v = data.get(f).map(|x| match x { modules::Value::Size{used,total,percent}=>format!("{used}/{total} GiB ({percent}%)"), modules::Value::Text(s)=>s.clone(), modules::Value::None=>"?".into() }).unwrap_or("?".into());
-        let v = v.replace('"',"\"\"");
-        println!("{},\"{}\"", label(f).replace(','," "), v);
+        let v = data.get(f).cloned().unwrap_or(modules::Value::Text("?".into()));
+        let txt = match v {
+            modules::Value::Size{used,total,percent}=>format!("{used}/{total} GiB ({percent}%)"),
+            modules::Value::Text(s)=>s,
+            modules::Value::None=>"?".into(),
+        };
+        println!("\"{}\",\"{}\"", label(f).replace('"', "\"\""), txt.replace('"', "\"\""));
     }
 }
+
 fn print_md(fields: &[String], data: &BTreeMap<String, modules::Value>) {
     println!("| Field | Value |");
     println!("|---|---|");
     for f in fields {
-        let v = data.get(f).map(|x| match x { modules::Value::Size{used,total,percent}=>format!("{used}/{total} GiB ({percent}%)"), modules::Value::Text(s)=>s.clone(), modules::Value::None=>"?".into() }).unwrap_or("?".into());
-        println!("| {} | {} |", label(f), v.replace('|',"\\|"));
+        let v = data.get(f).cloned().unwrap_or(modules::Value::Text("?".into()));
+        let txt = match v {
+            modules::Value::Size{used,total,percent}=>format!("{used}/{total} GiB ({percent}%)"),
+            modules::Value::Text(s)=>s,
+            modules::Value::None=>"?".into(),
+        };
+        println!("| {} | {} |", label(f).replace('|', "\\|"), txt.replace('|', "\\|"));
     }
 }
+
 fn print_oneline(fields: &[String], data: &BTreeMap<String, modules::Value>, ascii: bool) {
     let sep = if ascii { " | " } else { " · " };
     let mut parts = vec![];
     for f in fields {
-        let val = data.get(f).map(|x| match x { modules::Value::Size{used,total,percent}=>format!("{used}/{total}GiB {percent}%"), modules::Value::Text(s)=>s.clone(), modules::Value::None=>"?".into() }).unwrap_or("?".into());
-        parts.push(format!("{}: {}", label(f), val));
+        let v = data.get(f).cloned().unwrap_or(modules::Value::Text("?".into()));
+        let txt = match v {
+            modules::Value::Size{used,total,percent}=>format!("{used}/{total}GiB {percent}%"),
+            modules::Value::Text(s)=>s,
+            modules::Value::None=>"?".into(),
+        };
+        parts.push(format!("{}: {}", label(f), txt));
     }
     println!("{}", parts.join(sep));
 }
+
 fn print_doctor(opts:&Opts) {
     println!("version: {VERSION}");
     println!("platform: {} {}", std::env::consts::OS, std::env::consts::ARCH);
     println!("term: {}", std::env::var("TERM").unwrap_or_default());
     println!("colorterm: {}", std::env::var("COLORTERM").unwrap_or_default());
+    println!("no_color: {}", std::env::var_os("NO_COLOR").is_some());
     println!("color: {}", opts.color);
     println!("config: {}", config::config_path(opts.config_file.as_deref()).display());
     println!("cache: {}", config::cache_dir().display());
     println!("rust_core: yes");
+    println!("image_modes: {}", IMAGE_MODES.join(","));
+    for cmd in ["chafa","viu","jp2a","img2txt","timg"] {
+        let ok = std::process::Command::new("sh").args(["-c", &format!("command -v {cmd} >/dev/null 2>&1")]).status().map(|s|s.success()).unwrap_or(false);
+        println!("{cmd}: {}", if ok {"yes"} else {"no"});
+    }
 }
+
 fn set_config(opts: &Opts, text: &str) -> Result<(), String> {
     let Some((k,v)) = text.split_once('=') else { return Err(format!("--set needs KEY=VALUE: {text}")); };
     let path = config::config_path(opts.config_file.as_deref());
     let mut data = config::load_config(&path)?;
     let obj = data.as_object_mut().ok_or("invalid config")?;
-    if k=="modules" { let mods = normalize_modules(&v.split(',').map(|s|s.trim().to_string()).filter(|s|!s.is_empty()).collect::<Vec<_>>()); obj.insert(k.to_string(), json!(mods)); }
-    else { obj.insert(k.to_string(), json!(v)); }
+    match k {
+        "modules" => { let mods = normalize_modules(&v.split(',').map(|s|s.trim().to_string()).filter(|s|!s.is_empty()).collect::<Vec<_>>()); obj.insert(k.to_string(), json!(mods)); }
+        "cache-ttl"|"bar-width"|"image-width"|"image-height" => { let n=v.parse::<i64>().map_err(|_| format!("invalid {k}: {v}"))?; obj.insert(k.to_string(), json!(n)); }
+        "ascii"|"compact"|"oneline"|"all"|"no-cache"|"no-network"|"timing" => { let b = matches!(v, "true"|"yes"|"1"); obj.insert(k.to_string(), json!(b)); }
+        _ => { obj.insert(k.to_string(), json!(v)); }
+    }
     config::write_config(&path, &data)?;
     println!("set {k} = {v}");
     Ok(())
 }
-fn print_help() {
-    println!("nullfetch {VERSION} - PC info\n\nUsage:\n  nullfetch [options]\n\nOptions:\n  -h, --help          show help\n      --version       show version\n      --no-logo       hide logo\n      --logo NAME     logo name or auto/none\n      --logo-file F   custom ASCII logo file\n      --accent COLOR  accent color\n      --color MODE    auto/always/never\n      --no-color      disable color\n      --theme NAME    theme\n      --compact       compact layout\n      --all           all modules\n      --preset NAME   minimal/full/dev/server\n      --doctor        diagnostics\n  -o, --only FIELDS   comma separated fields\n      --format F      text,json,csv,markdown,oneline\n      --json          JSON output\n      --oneline       one line\n      --separator S   separator\n      --bar-width N   bar width\n      --bar-style S   blocks/ascii/arrows/dots/lines\n      --timing        timing to stderr\n      --no-cache      ignore cache\n      --no-network    skip public_ip\n      --list-fields   list fields\n      --list-presets  list presets\n      --list-logos    list logos\n      --list-image-modes list image modes\n      --save-config   save defaults\n      --show-config   show config\n      --reset-config  reset config\n      --init-config   write example config\n      --set K=V       set config\n      --config FILE   config file\n\nFields:\n  {} (default)\n  {} (extra)\n  command:<name>:<cmd> (custom)", FIELDS.join(" "), EXTRA_FIELDS.join(" "));
-}
 
-fn needs_python_fallback(opts: &Opts) -> bool {
-    opts.image.is_some()
+fn print_help() {
+    println!("nullfetch {VERSION} - PC info\n\nUsage:\n  nullfetch [options]\n\nOptions:\n  -h, --help          show this help\n      --version       show version\n      --no-logo       hide logo\n      --logo NAME     logo name or auto/none\n      --logo-file F   custom ASCII logo file\n      --image FILE    show image\n      --image-mode M  {}\n      --image-width N image width\n      --image-height N image height\n      --image-position P side/top/bottom\n      --image-bg C    image background\n      --accent COLOR  accent color\n      --color MODE    auto/always/never\n      --no-color      disable color\n      --theme NAME    theme\n      --compact       compact layout\n      --all           all modules\n      --preset NAME   minimal/full/dev/server\n      --doctor        diagnostics\n  -o, --only FIELDS   comma separated fields\n      --format F      text,json,csv,markdown,oneline\n      --json          JSON output\n      --oneline       one line\n      --separator S   separator\n      --bar-width N   bar width\n      --bar-style S   blocks/ascii/arrows/dots/lines\n      --cache-ttl N   cache ttl seconds\n      --no-cache      ignore cache\n      --no-network    skip public_ip/local_ip/network\n      --timing        timing to stderr\n      --list-fields   list fields\n      --list-presets  list presets\n      --list-logos    list logos\n      --list-image-modes list image modes\n      --save-config   save defaults\n      --show-config   show config\n      --reset-config  reset config\n      --init-config   write example config\n      --set K=V       set config\n      --config FILE   config file\n\nFields:\n  {} (default)\n  {} (extra)\n  command:<name>:<cmd> (custom)\n\nExamples:\n  nullfetch --preset dev\n  nullfetch --only cpu,ram,command:git:git\\ branch\\ --show-current\n  nullfetch --all --format markdown\n  nullfetch --image ~/pic.png --image-mode blocks", IMAGE_MODES.join(", "), FIELDS.join(" "), EXTRA_FIELDS.join(" "));
 }
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut opts = parse_args(&args);
 
-    // full parity for image rendering via Python implementation
-    if needs_python_fallback(&opts) {
-        delegate_to_python(&args);
-    }
-
-    if opts.help { print_help(); return ExitCode::SUCCESS; }
-    if opts.version { println!("nullfetch {VERSION}"); return ExitCode::SUCCESS; }
-    if opts.list_fields { for f in ALL_FIELDS { println!("{f}"); } return ExitCode::SUCCESS; }
-    if opts.list_logos { for (k,_) in logos::logos() { println!("{k}"); } return ExitCode::SUCCESS; }
-    if opts.list_presets { println!("minimal: os,kernel,cpu,ram\nfull: *\ndev: os,kernel,shell,terminal,de,wm,cpu,ram,disk,packages,processes,init\nserver: host,os,kernel,uptime,loadavg,cpu,ram,disk,network,local_ip,processes,init"); return ExitCode::SUCCESS; }
-    if opts.list_image_modes { for m in IMAGE_MODES { println!("{m}"); } return ExitCode::SUCCESS; }
-    if opts.doctor { print_doctor(&opts); return ExitCode::SUCCESS; }
-    if opts.show_config { let p=config::config_path(opts.config_file.as_deref()); match config::load_config(&p){Ok(v)=>println!("{}", serde_json::to_string_pretty(&v).unwrap()), Err(e)=>fail(&e)}; return ExitCode::SUCCESS; }
+    if let Some(cfg) = &opts.config_file { let _ = cfg; } // used by config_path
     if opts.reset_config { let p=config::config_path(opts.config_file.as_deref()); let _=std::fs::remove_file(&p); println!("reset {}", p.display()); return ExitCode::SUCCESS; }
+    if opts.show_config { let p=config::config_path(opts.config_file.as_deref()); match config::load_config(&p){Ok(v)=>{ println!("config: {}", p.display()); if let Some(obj)=v.as_object(){ for (k,val) in obj { let s = match val { Value::Array(a)=>a.iter().filter_map(|x|x.as_str()).collect::<Vec<_>>().join(", "), Value::Bool(b)=>b.to_string(), _=>val.as_str().map(|x|x.to_string()).unwrap_or_else(|| val.to_string()) }; println!("{k}: {s}"); } } else { println!("{}", serde_json::to_string_pretty(&v).unwrap()); } }, Err(e)=>fail(&e)}; return ExitCode::SUCCESS; }
     if opts.init_config { let p=config::config_path(opts.config_file.as_deref()); if p.exists() { fail(&format!("config already exists: {}; use --set or --reset-config", p.display())); } let sample=json!({"logo":"auto","theme":"default","color":"auto","modules":FIELDS,"separator":": ","bar-style":"blocks","bar-width":12}); if let Err(e)=config::write_config(&p,&sample){fail(&e)} println!("example config written: {}", p.display()); return ExitCode::SUCCESS; }
     if let Some(sv)=opts.set_value.clone() { if let Err(e)=set_config(&opts, &sv){fail(&e)} return ExitCode::SUCCESS; }
 
@@ -341,7 +438,6 @@ fn main() -> ExitCode {
         }
         merged.extend(args.clone());
         opts = parse_args(&merged);
-        if needs_python_fallback(&opts) { delegate_to_python(&args); }
     }
 
     apply_preset(&mut opts);
@@ -349,15 +445,23 @@ fn main() -> ExitCode {
     if opts.color_mode == "never" { opts.color = false; }
     if opts.color_mode == "always" { opts.color = true; }
 
+    if opts.help { print_help(); return ExitCode::SUCCESS; }
+    if opts.version { println!("nullfetch {VERSION}"); return ExitCode::SUCCESS; }
+    if opts.list_fields { for f in ALL_FIELDS { println!("{f}"); } return ExitCode::SUCCESS; }
+    if opts.list_logos { let mut names: Vec<&str>=logos::logos().iter().map(|(k,_)|*k).collect(); names.sort(); for n in names { println!("{n}"); } return ExitCode::SUCCESS; }
+    if opts.list_presets { println!("minimal: os,kernel,cpu,ram\nfull: *\ndev: os,kernel,shell,terminal,de,wm,cpu,ram,disk,packages,processes,init\nserver: host,os,kernel,uptime,loadavg,cpu,ram,disk,network,local_ip,processes,init"); return ExitCode::SUCCESS; }
+    if opts.list_image_modes { for m in IMAGE_MODES { println!("{m}"); } return ExitCode::SUCCESS; }
+    if opts.doctor { print_doctor(&opts); return ExitCode::SUCCESS; }
+
     let mut fields: Vec<String> = if opts.all { ALL_FIELDS.iter().map(|s| s.to_string()).collect() }
         else if let Some(only)=&opts.only { normalize_modules(&only.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect::<Vec<_>>()) }
         else if opts.oneline || opts.format=="oneline" { vec!["user","host","os","kernel","ram","disk"].into_iter().map(String::from).collect() }
         else { FIELDS.iter().map(|s| s.to_string()).collect() };
-    if opts.no_network { fields.retain(|f| f!="public_ip"); }
+    if opts.no_network { fields.retain(|f| f!="public_ip" && f!="local_ip" && f!="network"); }
     let fields = fields;
 
     let started = Instant::now();
-    let (data, timings) = collect(&fields);
+    let (data, timings) = collect(&fields, opts.cache_ttl, !opts.no_cache);
     if opts.timing {
         let elapsed = started.elapsed().as_secs_f64()*1000.0;
         let mut tv: Vec<_> = timings.iter().collect();
