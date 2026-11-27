@@ -4,91 +4,44 @@
 
 # nullfetch
 
-**A fast, tiny, no-nonsense system fetch for Linux.**  
-Fast Rust core. Python fallback. Zero required dependencies. Terminal images. 37+ modules. Presets. Command modules. Your config.
+**Small system fetch. Fast Rust core, Python compatibility layer.**  
+Linux-first, no required dependencies, terminal images, presets, command modules, script-friendly output.
 
 <p>
   <a href="https://github.com/pybindi/nullfetch/releases"><img src="https://img.shields.io/github/v/release/pybindi/nullfetch?style=for-the-badge&color=478061&label=release" alt="Release"></a>
-  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+"></a>
-  <a href="#"><img src="https://img.shields.io/badge/platform-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux"></a>
-  <a href="#"><img src="https://img.shields.io/badge/dependencies-zero-brightgreen?style=for-the-badge" alt="Zero dependencies"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge" alt="MIT License"></a>
+  <a href="#"><img src="https://img.shields.io/badge/platform-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux"></a>
+  <a href="#"><img src="https://img.shields.io/badge/deps-zero-brightgreen?style=for-the-badge" alt="Zero dependencies"></a>
 </p>
-
-<p>
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-features">Features</a> •
-  <a href="#-images">Images</a> •
-  <a href="#-modules">Modules</a> •
-  <a href="#-configuration">Configuration</a> •
-  <a href="#-options">Options</a>
-</p>
-
-<img src="assets/demo.gif" alt="nullfetch demo" width="920">
 
 </div>
 
 ---
 
-## Why nullfetch
+## What it is
 
-| | |
-|---|---|
-| **Fast by default** | Modules collected in parallel, fast fields first, slow values cached, lazy imports. |
-| **Looks good everywhere** | ASCII logos, distro colors, themes, custom separators, bar styles, compact layout, and plain `--ascii` mode. |
-| **More than logos** | Built-in PNG rendering, Kitty/iTerm2 protocols, and optional external converters for other formats. |
-| **Script-friendly** | `text`, `json`, `csv`, `markdown`, and `oneline` outputs with predictable module selection. |
-| **Runs where you need it** | Linux first, basic Windows support via `nullfetch.bat`. Rust binary for speed, Python fallback. |
+`nullfetch` is a fast system information tool for your terminal.  
+Version 3.0 adds a **Rust core** for fast startup and keeps the **Python implementation** for compatibility/fallback.
 
-## ✨ Features
+- **Rust binary**: fast default run, parallel module collection, cheap `/proc`/`/sys` reads.
+- **Python CLI (`nullfetch.py`)**: full existing behavior, tests, images/logos/config/features developed in 1.x/2.x.
+- **Windows**: `nullfetch.bat` launcher (Python required).
 
-<table>
-<tr>
-<td width="50%" valign="top">
+> Honest status: the Rust core is fast and covers the main CLI/modules, but not every Python feature is fully ported yet. For full legacy behavior, use `python3 nullfetch.py ...` or install without cargo.
 
-### System info
-- 31 modules, from classic fetch fields to loadavg, boot/init, DE/WM, packages, temperature, network, locale, and more.
-- `--all` for everything, `--only` for a precise set.
-- Custom command modules: `command:name:cmd`.
-- Parallel collection, short-TTL cache, and `--timing` with slowest modules.
+## Benchmarks (this machine, warmup, `NO_COLOR=1`)
 
-</td>
-<td width="50%" valign="top">
+| Command | Median | Min |
+|---|---:|---:|
+| `nullfetch --no-color --logo none` (Rust, 8 default fields) | 4.1 ms | 3.8 ms |
+| `nullfetch --only os,kernel,cpu,ram --no-color --logo none` (Rust) | 1.1 ms | 1.0 ms |
+| `fastfetch --logo none` | 8.0 ms | 7.3 ms |
 
-### Terminal visuals
-- Distro-aware logos and custom ASCII art files.
-- 11 themes, named/hex accents, `#rgb`/`#rrggbb`.
-- 5 bar styles: `blocks`, `ascii`, `arrows`, `dots`, `lines`.
+Results depend on hardware, OS, cache, and selected modules.
 
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
+## Install
 
-### Images in terminal
-- Built-in PNG decoder (stdlib only).
-- Half-block color rendering or plain ASCII.
-- Kitty and iTerm2 protocols.
-- Optional `chafa`, `viu`, `jp2`, `img2txt`, `timg`, `sixel`.
-
-</td>
-<td width="50%" valign="top">
-
-### Works in scripts
-- `--json` for machines, `--format markdown/csv` for reports.
-- `--oneline` for status bars.
-- `--timing` to inspect collection performance.
-- Stable default JSON fields for compatibility.
-
-</td>
-</tr>
-</table>
-
-## 🚀 Quick Start
-
-### Install
-
-#### Linux / macOS terminal
+### Linux (recommended)
 
 ```bash
 git clone https://github.com/pybindi/nullfetch.git
@@ -96,7 +49,23 @@ cd nullfetch
 ./install.sh
 ```
 
-#### Windows
+`install.sh` behavior:
+- If `cargo` is available: builds and installs `target/release/nullfetch`.
+- Otherwise: installs `nullfetch.py` as `nullfetch`.
+
+Make sure `~/.local/bin` is in `PATH`:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### Manual Python run
+
+```bash
+python3 nullfetch.py --all
+```
+
+### Windows
 
 ```bat
 git clone https://github.com/pybindi/nullfetch.git
@@ -104,286 +73,104 @@ cd nullfetch
 nullfetch.bat --all
 ```
 
-> На Windows нужен установленный Python 3.10+. `nullfetch.bat` сам найдёт `py -3` или `python`.
+Requires Python 3.10+.
 
-<details>
-<summary><b>More install options</b></summary>
-
-#### Manual
+## Usage
 
 ```bash
-chmod +x nullfetch.py
-ln -s "$PWD/nullfetch.py" ~/.local/bin/nullfetch
-```
-
-Keep `nullfetch_image.py` and `logos.py` next to the script, or in `$prefix/share/nullfetch/`.
-
-#### Arch Linux
-
-```bash
-git clone https://github.com/pybindi/nullfetch.git
-cd nullfetch
-makepkg -si
-```
-
-Set the release archive checksum in `PKGBUILD` / `.SRCINFO` after tagging a release.
-
-#### Debian / Ubuntu
-
-```bash
-sudo apt install ./nullfetch_3.0.0_all.deb
-```
-
-Build from source:
-
-```bash
-sudo apt install dpkg-dev
-./scripts/build-deb.sh
-sudo apt install ./dist/nullfetch_3.0.0_all.deb
-```
-
-Verify release checksums:
-
-```bash
-sha256sum -c SHA256SUMS
-```
-
-</details>
-
-### Try it
-
-```bash
-nullfetch                          # classic logo + default modules
-nullfetch --all                    # every module
-nullfetch --preset dev             # ready-made layout for dev machines
+nullfetch                          # default fields
+nullfetch --all                    # all modules
 nullfetch --only cpu,ram,temperature
-nullfetch --only user,command:git:git\ branch\ --show-current
-nullfetch --doctor                 # check terminal/image/capabilities
-nullfetch --theme dracula --bar-style dots
-nullfetch --image ~/wallpaper.png  --image-mode blocks
-```
-
-## 🖼 Images
-
-`nullfetch` can render images next to your system info.
-
-```bash
-nullfetch --image ~/wallpaper.png
-nullfetch --image photo.jpg --image-mode chafa --image-position top
-nullfetch --image avatar.png --image-mode blocks --image-width 30
-nullfetch --image logo.png --image-mode ascii --color never
-nullfetch --image logo.png --image-mode kitty
-```
-
-| Mode | Needs | Best for |
-|:-----|:------|:---------|
-| `auto` | — | Picking the best available renderer |
-| `blocks` | PNG | Built-in color output, no external tools |
-| `ascii` | PNG | Plain terminals / no color |
-| `kitty` | Kitty + PNG | Native high-quality terminal graphics |
-| `iterm` | iTerm2 / WezTerm | Inline image protocol |
-| `chafa`, `sixel` | `chafa` | Many formats, good quality |
-| `viu`, `jp2`, `img2txt`, `timg` | matching tool | External fallback converters |
-
-> [!TIP]
-> The built-in decoder supports **non-interlaced PNG**. For JPEG/WebP/GIF/interlaced PNG, use `chafa`, `viu`, `timg`, or the iTerm2 protocol.
-
-## 🧩 Modules
-
-**Default:** `user host os kernel cpu gpu ram disk`
-
-**Extra:** `arch uptime boot_time loadavg cpu_cores swap disks network local_ip public_ip battery temperature resolution shell terminal de wm packages processes init locale timezone date`
-
-**Custom:** `command:<name>:<cmd>` (use in `--only` or config `modules`)
-
-```bash
-nullfetch --list-fields
-nullfetch --all
-nullfetch --all --no-network
-nullfetch --only uptime,shell,de,wm,packages
-nullfetch --only os,command:git:git\ branch\ --show-current
-```
-
-> [!NOTE]
-> `public_ip` is only queried when requested. Slow modules are collected in parallel and cached for a short TTL. Control with `--cache-ttl N` or `--no-cache`.
-
-## ⚙ Configuration
-
-Save your look once, keep it forever:
-
-```bash
-nullfetch --logo cat --accent orange --theme neon --save-config
-nullfetch --preset dev --save-config
-nullfetch --show-config
-nullfetch --reset-config
-```
-
-Edit config directly or by key:
-
-```bash
-nullfetch --init-config
-nullfetch --set theme=gruvbox
-nullfetch --set modules=os,cpu,ram,temperature
-nullfetch --set image=$HOME/avatar.png
-```
-
-<details>
-<summary><b>Config details</b></summary>
-
-- Path: `~/.config/nullfetch/config.json` (or `$XDG_CONFIG_HOME/nullfetch/config.json`)
-- Alternate file: `--config FILE`
-- CLI options override config values.
-- Keys: `logo`, `logo-file`, `accent`, `theme`, `color`, `preset`, `image`, `image-mode`, `image-width`, `image-height`, `image-position`, `image-bg`, `modules`, `separator`, `bar-style`, `bar-width`, `format`, `cache-ttl`, `ascii`, `compact`, `all`, `no-cache`, `no-network`, `timing`.
-
-**Themes:** `default mono light neon dark nord gruvbox dracula tokyo solarized matrix`  
-**Colors:** named colors, distro names, `#rrggbb`, `#rgb`  
-**Presets:** `minimal`, `full`, `dev`, `server`
-
-</details>
-
-## 📤 Output Formats
-
-```bash
-nullfetch --json
+nullfetch --preset dev
+nullfetch --doctor
+nullfetch --timing
+nullfetch --format json
 nullfetch --format markdown --only os,cpu,ram
-nullfetch --format csv --only user,host,ram
 nullfetch --oneline
 ```
 
-```json
-{
-  "user": "matuha",
-  "host": "void",
-  "os": "Void Linux",
-  "kernel": "6.18.60_1",
-  "cpu": "Intel(R) Core(TM) i7-4600U CPU @ 2.10GHz",
-  "gpu": "Intel Corporation Haswell-ULT Integrated Graphics Controller",
-  "ram": { "used": 2.4, "total": 7.7, "percent": 31 },
-  "disk": { "used": 31.2, "total": 237.4, "percent": 13 }
-}
-```
+### Command modules
 
-## 🧰 Options
-
-<details open>
-<summary><b>Common options</b></summary>
-
-| Option | Description |
-|:---|:---|
-| `-h`, `--help` | Show help |
-| `--version` | Show version |
-| `--all` | Show every module |
-| `--preset NAME` | Built-in preset: `minimal`, `full`, `dev`, `server` |
-| `--doctor` | Diagnostics for terminal/image/cache |
-| `-o`, `--only FIELDS` | Show selected modules / `command:name:cmd` |
-| `--list-fields` | List module names |
-| `--list-presets` | List presets |
-| `--json` | JSON output |
-| `--format FORMAT` | `text`, `json`, `csv`, `markdown`, `oneline` |
-| `--oneline` | Compact one-line output |
-| `--timing` | Print collection time and slowest modules |
-
-</details>
-
-<details>
-<summary><b>Look & feel</b></summary>
-
-| Option | Description |
-|:---|:---|
-| `--logo NAME` | `auto`, `none`, or logo name |
-| `--logo-file FILE` | Custom ASCII art file |
-| `--accent COLOR` | Name, distro name, `#rgb`, `#rrggbb` |
-| `--theme NAME` | Visual theme |
-| `--color MODE` | `auto`, `always`, `never` |
-| `--no-color` | Disable colors |
-| `--ascii` | ASCII-only bars/separators |
-| `--compact` | Tighter layout |
-| `--separator TEXT` | Label/value separator |
-| `--bar-style STYLE` | `blocks`, `ascii`, `arrows`, `dots`, `lines` |
-| `--bar-width N` | Bar width |
-
-</details>
-
-<details>
-<summary><b>Images & config</b></summary>
-
-| Option | Description |
-|:---|:---|
-| `--image FILE` | Image to display |
-| `--image-mode MODE` | Renderer mode |
-| `--image-width N` / `--image-height N` | Image size in cells |
-| `--image-position P` | `side`, `top`, `bottom` |
-| `--image-bg COLOR` | Background for transparent pixels |
-| `--list-image-modes` | List image renderers |
-| `--save-config` / `--show-config` | Save or inspect defaults |
-| `--reset-config` / `--init-config` | Reset or create example config |
-| `--set KEY=VALUE` | Change one config key |
-| `--config FILE` | Alternate config file |
-| `--no-cache` / `--cache-ttl N` | Cache control |
-| `--no-network` | Skip network modules |
-
-</details>
-
-## 🎨 Logos
-
-Pick a logo by name, or bring your own:
+You can add custom fields:
 
 ```bash
-nullfetch --list-logos
-nullfetch --logo arch
-nullfetch --logo-file ~/art.txt
+nullfetch --only os,command:git:git\ branch\ --show-current
 ```
 
-<div align="center">
-  <img src="assets/logos.png" alt="Available logos" width="900">
-</div>
+In config `modules`, use `command:<name>:<cmd>`.
 
-## ⚡ Performance
+## Modules
+
+**Default:** `user host os kernel cpu gpu ram disk`
+
+**Extra:** `arch uptime boot_time loadavg cpu_cores swap disks network local_ip public_ip battery temperature resolution shell terminal de wm packages processes init locale timezone date motherboard bios display audio bluetooth power`
 
 ```bash
-time nullfetch >/dev/null
-nullfetch --timing
-nullfetch --doctor
-nullfetch --only os,kernel,cpu,ram --no-logo
+nullfetch --list-fields
+nullfetch --list-presets
 ```
 
-- Rust release binary for fast startup
-- Parallel module collection
-- Cached slow values under `$XDG_CACHE_HOME/nullfetch`
-- Lazy/cheap `/proc` and `/sys` reads on hot paths
+## Config
 
-- Concurrent module collection
-- Cached slow values under `$XDG_CACHE_HOME/nullfetch`
-- Lazy imports for heavy stdlib modules
-- `--no-cache` when you want fresh values
+Config path: `~/.config/nullfetch/config.json` (or `$XDG_CONFIG_HOME/nullfetch/config.json`).
 
-## 🗂 Project Structure
+```bash
+nullfetch --init-config
+nullfetch --show-config
+nullfetch --set theme=gruvbox
+nullfetch --set modules=os,cpu,ram,command:git:git\ branch\ --show-current
+nullfetch --reset-config
+```
+
+CLI flags override config values.
+
+## Output formats
+
+- `text` (default)
+- `json`
+- `csv`
+- `markdown`
+- `oneline`
+
+Default `--json` keeps the original 8 fields for compatibility unless you select fields explicitly.
+
+## Images / logos
+
+The Python implementation includes logo rendering and terminal image support (`nullfetch_image.py`): PNG blocks/ascii, Kitty/iTerm2, and optional external converters (`chafa`, `viu`, `jp2a`, `img2txt`, `timg`, `sixel`).
+
+```bash
+python3 nullfetch.py --logo arch
+python3 nullfetch.py --image ~/wallpaper.png --image-mode blocks
+python3 nullfetch.py --list-image-modes
+```
+
+Rust core currently focuses on fast data collection; image/logo parity is being ported.
+
+## Project layout
 
 ```text
-nullfetch/
-├── nullfetch.py        # CLI, modules, rendering
-├── nullfetch_image.py  # PNG decoder + terminal image protocols
-├── nullfetch.bat       # Windows launcher
-├── logos.py            # ASCII art collection
-├── assets/             # banner, demo, logos
-├── scripts/            # completions + packaging helpers
-├── tests/              # pytest suite
-├── debian/             # Debian packaging
-└── PKGBUILD            # Arch packaging
+.
+├── src/                 # Rust core (v3)
+├── nullfetch.py         # Python CLI/compat layer
+├── nullfetch_image.py   # Python image rendering
+├── logos.py             # ASCII logos
+├── nullfetch.bat        # Windows launcher
+├── scripts/             # completions, packaging helpers
+├── tests/               # Python pytest suite
+├── debian/              # Debian packaging
+└── PKGBUILD             # Arch packaging
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+## Development
 
 ```bash
-python -m pytest -q
+# Python tests
+python3 -m pytest -q
+
+# Rust build
+cargo build --release
 ```
 
-## 📄 License
+## License
 
-[MIT](LICENSE) — free to use, modify, and share.
-
-<div align="center">
-  <sub>Made for people who want their terminal to say “I use Linux” without saying a word.</sub>
-</div>
+MIT. See [LICENSE](LICENSE).
