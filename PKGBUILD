@@ -17,6 +17,7 @@ package() {
     install -Dm755 nullfetch.py "$pkgdir/usr/bin/nullfetch"
     install -Dm644 logos.py "$pkgdir/usr/share/nullfetch/logos.py"
     install -Dm644 nullfetch_image.py "$pkgdir/usr/share/nullfetch/nullfetch_image.py"
+    install -Dm644 nullfetch.bat "$pkgdir/usr/share/nullfetch/nullfetch.bat"
     install -Dm644 scripts/completions/nullfetch.bash "$pkgdir/usr/share/bash-completion/completions/nullfetch"
     install -Dm644 scripts/completions/_nullfetch "$pkgdir/usr/share/zsh/site-functions/_nullfetch"
     install -Dm644 scripts/completions/nullfetch.fish "$pkgdir/usr/share/fish/vendor_completions.d/nullfetch.fish"
