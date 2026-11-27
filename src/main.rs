@@ -457,13 +457,29 @@ fn term_width() -> (usize, usize) {
     (80,24)
 }
 
+fn compact_json_value(v: &modules::Value) -> Value {
+    match v {
+        modules::Value::Size{..} => modules::value_to_json(v),
+        modules::Value::Text(_) | modules::Value::None => modules::value_to_json(v),
+        modules::Value::Info{fields,..} => {
+            if let (Some(u),Some(t),Some(p))=(fields.get("used"),fields.get("total"),fields.get("percent")) {
+                if let (Ok(used),Ok(total),Ok(percent))=(u.parse::<f64>(),t.parse::<f64>(),p.parse::<i64>()) {
+                    return json!({"used":used,"total":total,"percent":percent});
+                }
+            }
+            json!(modules::value_text(v))
+        }
+    }
+}
+
 fn print_json(specs: &[ModuleSpec], data: &BTreeMap<String, modules::Value>) {
     let mut m = Map::new();
-    let default_only = specs.len()==FIELDS.len() && specs.iter().zip(FIELDS.iter()).all(|(a,b)| a.kind==*b);
+    let default_only = specs.len()==FIELDS.len() && specs.iter().zip(FIELDS.iter()).all(|(a,b)| a.kind==*b) && specs.iter().all(|s| s.format.is_none() && s.key.is_none());
     let kinds: Vec<String> = if default_only { FIELDS.iter().map(|s|s.to_string()).collect() } else { specs.iter().map(|s|s.kind.clone()).collect() };
     for k in kinds {
         let v = data.get(&k).cloned().unwrap_or(modules::Value::Text("?".into()));
-        m.insert(k, modules::value_to_json(&v));
+        let j = if default_only { compact_json_value(&v) } else { modules::value_to_json(&v) };
+        m.insert(k, j);
     }
     println!("{}", serde_json::to_string_pretty(&Value::Object(m)).unwrap());
 }

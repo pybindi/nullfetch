@@ -19,7 +19,16 @@ pub fn value_to_json(v: &Value) -> J {
         Value::Info { text, fields } => {
             let mut m = serde_json::Map::new();
             m.insert("text".into(), json!(text));
-            for (k,val) in fields { m.insert(k.clone(), json!(val)); }
+            for (k,val) in fields {
+                if k=="text" { continue; }
+                if ["used","total"].contains(&k.as_str()) {
+                    if let Ok(n)=val.parse::<f64>() { m.insert(k.clone(), json!(n)); continue; }
+                }
+                if k=="percent" {
+                    if let Ok(n)=val.parse::<i64>() { m.insert(k.clone(), json!(n)); continue; }
+                }
+                m.insert(k.clone(), json!(val));
+            }
             J::Object(m)
         }
         Value::None => json!("?"),
@@ -312,16 +321,24 @@ fn meminfo_kb() -> std::collections::HashMap<String,u64> {
     }
     m
 }
-fn size_kb(used_kb: u64, total_kb: u64) -> Value {
+fn size_kb(used_kb: u64, total_kb: u64) -> Value { size_kb_named(used_kb,total_kb,"") }
+fn size_kb_named(used_kb: u64, total_kb: u64, name: &str) -> Value {
     let total = (total_kb as f64 / 1024.0 / 1024.0 * 10.0).round()/10.0;
     let used = (used_kb as f64 / 1024.0 / 1024.0 * 10.0).round()/10.0;
     let pct = if total_kb>0 { ((used_kb as f64/total_kb as f64)*100.0).round() as i64 } else {0};
-    Value::Size{used,total,percent:pct}
+    let text = format!("{used}/{total} GiB ({pct}%)");
+    let mut f = std::collections::BTreeMap::new();
+    f.insert("text".into(), text.clone());
+    f.insert("used".into(), format!("{used}"));
+    f.insert("total".into(), format!("{total}"));
+    f.insert("percent".into(), format!("{pct}"));
+    if !name.is_empty() { f.insert("name".into(), name.to_string()); }
+    Value::Info { text, fields: f }
 }
 fn ram() -> Value {
     if cfg!(target_os="linux") {
         let m=meminfo_kb(); let t=m.get("MemTotal").copied().unwrap_or(0); let a=m.get("MemAvailable").copied().unwrap_or_else(|| m.get("MemFree").copied().unwrap_or(0));
-        if t>0 { return size_kb(t.saturating_sub(a),t); }
+        if t>0 { return size_kb_named(t.saturating_sub(a),t,"ram"); }
     }
     if cfg!(target_os="macos") {
         let total = cmd("sysctl", &["-n","hw.memsize"]).trim().parse::<u64>().unwrap_or(0) / 1024;
@@ -331,19 +348,19 @@ fn ram() -> Value {
             if let Some((k,v))=line.split_once(':') { let n=v.trim().trim_end_matches('.').replace('.',""); let n=n.parse::<u64>().unwrap_or(0); match k.trim() {"Pages free"=>free=n,"Pages inactive"=>inactive=n,"Pages speculative"=>spec=n,_=>{}} }
         }
         let avail = (free+inactive+spec).saturating_mul(page)/1024;
-        if total>0 { return size_kb(total.saturating_sub(avail), total); }
+        if total>0 { return size_kb_named(total.saturating_sub(avail), total, "ram"); }
     }
     if cfg!(target_os="windows") {
         let out = cmd("powershell", &["-NoProfile","-Command","$os=gcim Win32_OperatingSystem; \"$($os.TotalVisibleMemorySize) $($os.FreePhysicalMemory)\""]);
         let p:Vec<u64>=out.split_whitespace().filter_map(|n| n.parse().ok()).collect();
-        if p.len()==2 { return size_kb(p[0].saturating_sub(p[1]), p[0]); }
+        if p.len()==2 { return size_kb_named(p[0].saturating_sub(p[1]), p[0], "ram"); }
     }
     Value::Text("?".into())
 }
 fn swap() -> Value {
-    if cfg!(target_os="linux") { let m=meminfo_kb(); let t=m.get("SwapTotal").copied().unwrap_or(0); let f=m.get("SwapFree").copied().unwrap_or(0); if t==0 {return Value::Text("none".into())} else {return size_kb(t.saturating_sub(f),t)} }
-    if cfg!(target_os="macos") { let out=cmd("sysctl",&["-n","vm.swapusage"]); if !out.is_empty() { return Value::Text(out); } }
-    if cfg!(target_os="windows") { let out=cmd("powershell",&["-NoProfile","-Command","$os=gcim Win32_OperatingSystem; \"$($os.TotalVirtualMemorySize-$os.FreeVirtualMemory) $($os.TotalVirtualMemorySize)\""]); let p:Vec<u64>=out.split_whitespace().filter_map(|n|n.parse().ok()).collect(); if p.len()==2 { return size_kb(p[0],p[1]); } }
+    if cfg!(target_os="linux") { let m=meminfo_kb(); let t=m.get("SwapTotal").copied().unwrap_or(0); let f=m.get("SwapFree").copied().unwrap_or(0); if t==0 {return Value::Text("none".into())} else {return size_kb_named(t.saturating_sub(f),t,"swap")} }
+    if cfg!(target_os="macos") { let out=cmd("sysctl",&["-n","vm.swapusage"]); if !out.is_empty() { return info_simple("swap", out); } }
+    if cfg!(target_os="windows") { let out=cmd("powershell",&["-NoProfile","-Command","$os=gcim Win32_OperatingSystem; \"$($os.TotalVirtualMemorySize-$os.FreeVirtualMemory) $($os.TotalVirtualMemorySize)\""]); let p:Vec<u64>=out.split_whitespace().filter_map(|n|n.parse().ok()).collect(); if p.len()==2 { return size_kb_named(p[0],p[1],"swap"); } }
     Value::Text("?".into())
 }
 
@@ -355,16 +372,16 @@ fn disk_path(path:&str) -> Value {
         use std::mem::MaybeUninit;
         unsafe extern "C" { fn statvfs(path:*const i8, buf:*mut Statvfs)->i32; }
         #[repr(C)] struct Statvfs { f_bsize:u64,f_frsize:u64,f_blocks:u64,f_bfree:u64,f_bavail:u64,f_files:u64,f_ffree:u64,f_favail:u64,f_fsid:u64,f_flag:u64,f_namemax:u64,__f_spare:[i32;6] }
-        if let Ok(c)=CString::new(path) { unsafe { let mut buf=MaybeUninit::<Statvfs>::uninit(); if statvfs(c.as_ptr(), buf.as_mut_ptr())==0 { let b=buf.assume_init(); let total=b.f_blocks.saturating_mul(b.f_frsize)/1024; let avail=b.f_bavail.saturating_mul(b.f_frsize)/1024; return size_kb(total.saturating_sub(avail), total); } } }
+        if let Ok(c)=CString::new(path) { unsafe { let mut buf=MaybeUninit::<Statvfs>::uninit(); if statvfs(c.as_ptr(), buf.as_mut_ptr())==0 { let b=buf.assume_init(); let total=b.f_blocks.saturating_mul(b.f_frsize)/1024; let avail=b.f_bavail.saturating_mul(b.f_frsize)/1024; return size_kb_named(total.saturating_sub(avail), total, path); } } }
     }
     if cfg!(target_os="windows") {
         let drive = path.chars().next().unwrap_or('C');
         let out = cmd("powershell", &["-NoProfile","-Command",&format!("$d=Get-PSDrive -Name {drive}; \"$($d.Used/1KB) $(($d.Used+$d.Free)/1KB)\"")]);
         let p:Vec<u64>=out.split_whitespace().filter_map(|n| n.replace(',', ".").parse::<f64>().ok().map(|x| x as u64)).collect();
-        if p.len()==2 { return size_kb(p[0],p[1]); }
+        if p.len()==2 { return size_kb_named(p[0],p[1], path); }
     }
     let out = cmd("df", &["-Pk", path]);
-    if let Some(line)=out.lines().nth(1) { let p:Vec<&str>=line.split_whitespace().collect(); if p.len()>=4 { let t=p[1].parse().unwrap_or(0); let u=p[2].parse().unwrap_or(0); return size_kb(u,t); } }
+    if let Some(line)=out.lines().nth(1) { let p:Vec<&str>=line.split_whitespace().collect(); if p.len()>=4 { let t=p[1].parse().unwrap_or(0); let u=p[2].parse().unwrap_or(0); return size_kb_named(u,t,path); } }
     Value::Text("?".into())
 }
 
