@@ -92,6 +92,21 @@ fn os_name() -> String {
             if let Some(v) = line.strip_prefix("PRETTY_NAME=") { return v.trim_matches('"').to_string(); }
         }
     }
+    if cfg!(windows) { return "Windows".into(); }
+    std::env::consts::OS.to_string()
+}
+
+pub fn detect_distro_id() -> String {
+    if let Ok(s) = fs::read_to_string("/etc/os-release") {
+        let mut id = String::new();
+        let mut id_like = String::new();
+        for line in s.lines() {
+            if let Some(v) = line.strip_prefix("ID=") { id = v.trim_matches('"').to_lowercase(); }
+            if let Some(v) = line.strip_prefix("ID_LIKE=") { id_like = v.trim_matches('"').to_lowercase(); }
+        }
+        if !id.is_empty() { return id; }
+        if let Some(first) = id_like.split_whitespace().next() { return first.to_string(); }
+    }
     std::env::consts::OS.to_string()
 }
 fn kernel() -> String { read("/proc/sys/kernel/osrelease").trim().to_string().if_empty("?".into()) }
