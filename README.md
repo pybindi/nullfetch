@@ -34,11 +34,11 @@ Pure Python. Zero required dependencies. Terminal images. 31 modules. Presets. C
 
 | | |
 |---|---|
-| **Fast by default** | Modules are collected in parallel, slow values are cached, and `/etc/os-release` lookups are memoized. |
+| **Fast by default** | Modules collected in parallel, fast fields first, slow values cached, lazy imports. |
 | **Looks good everywhere** | ASCII logos, distro colors, themes, custom separators, bar styles, compact layout, and plain `--ascii` mode. |
 | **More than logos** | Built-in PNG rendering, Kitty/iTerm2 protocols, and optional external converters for other formats. |
 | **Script-friendly** | `text`, `json`, `csv`, `markdown`, and `oneline` outputs with predictable module selection. |
-| **Zero required deps** | Runs with Python standard library on Linux. Optional tools only unlock extra image/GPU capabilities. |
+| **Runs where you need it** | Linux first, basic Windows support via `nullfetch.bat`. Zero required deps. |
 
 ## ✨ Features
 
@@ -88,11 +88,23 @@ Pure Python. Zero required dependencies. Terminal images. 31 modules. Presets. C
 
 ### Install
 
+#### Linux / macOS terminal
+
 ```bash
 git clone https://github.com/pybindi/nullfetch.git
 cd nullfetch
 ./install.sh
 ```
+
+#### Windows
+
+```bat
+git clone https://github.com/pybindi/nullfetch.git
+cd nullfetch
+nullfetch.bat --all
+```
+
+> На Windows нужен установленный Python 3.10+. `nullfetch.bat` сам найдёт `py -3` или `python`.
 
 <details>
 <summary><b>More install options</b></summary>
@@ -346,6 +358,7 @@ nullfetch --only os,kernel,cpu,ram --no-logo
 nullfetch/
 ├── nullfetch.py        # CLI, modules, rendering
 ├── nullfetch_image.py  # PNG decoder + terminal image protocols
+├── nullfetch.bat       # Windows launcher
 ├── logos.py            # ASCII art collection
 ├── assets/             # banner, demo, logos
 ├── scripts/            # completions + packaging helpers

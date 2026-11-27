@@ -69,6 +69,12 @@ ALL_FIELDS = [
     "locale",
     "timezone",
     "date",
+    "motherboard",
+    "bios",
+    "display",
+    "audio",
+    "bluetooth",
+    "power",
 ]
 EXTRA_FIELDS = [name for name in ALL_FIELDS if name not in FIELDS]
 SIZE_FIELDS = {"ram", "disk", "swap"}
@@ -105,6 +111,12 @@ LABELS = {
     "locale": "locale",
     "timezone": "timezone",
     "date": "date",
+    "motherboard": "board",
+    "bios": "bios",
+    "display": "display",
+    "audio": "audio",
+    "bluetooth": "bt",
+    "power": "power",
 }
 
 BAR_STYLES = {
@@ -121,6 +133,9 @@ SLOW_FIELDS = {
     "resolution": 120,
     "temperature": 30,
     "battery": 30,
+    "audio": 60,
+    "bluetooth": 30,
+    "display": 60,
 }
 
 DISTRO_COLORS = {
@@ -406,7 +421,14 @@ def os_release():
     try:
         return platform.freedesktop_os_release()
     except OSError:
-        return {}
+        pass
+    if sys.platform == "win32":
+        return {
+            "ID": "windows",
+            "NAME": "Windows",
+            "PRETTY_NAME": platform.system() + " " + platform.release(),
+        }
+    return {}
 
 
 def get_user():
@@ -426,14 +448,23 @@ def get_os():
 
 
 def get_kernel():
+    if sys.platform == "win32":
+        return platform.version()
     return platform.release()
 
 
 def get_cpu():
+    if sys.platform == "win32":
+        name = (
+            os.environ.get("PROCESSOR_IDENTIFIER")
+            or platform.processor()
+            or platform.machine()
+        )
+        return name or "?"
     for line in read("/proc/cpuinfo").splitlines():
         if line.startswith("model name"):
             return line.split(":", 1)[1].strip()
-    return "?"
+    return platform.processor() or "?"
 
 
 def get_gpu():
@@ -467,6 +498,32 @@ def size_value(used, total):
 
 
 def get_ram():
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            stat = MEMORYSTATUSEX()
+            stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
+                total = stat.ullTotalPhys / 1024**3
+                used = (stat.ullTotalPhys - stat.ullAvailPhys) / 1024**3
+                return size_value(round(used, 1), round(total, 1))
+        except Exception:
+            return "?"
+
     info = {}
     for line in read("/proc/meminfo").splitlines():
         if ":" in line:
@@ -484,15 +541,13 @@ def get_ram():
 
 
 def get_disk():
+    path = os.environ.get("SystemDrive", "C:") + "\\" if sys.platform == "win32" else "/"
     try:
-        st = os.statvfs("/")
+        usage = shutil.disk_usage(path)
     except OSError:
         return "?"
-
     gb = 1024**3
-    total = st.f_blocks * st.f_frsize
-    free = st.f_bavail * st.f_frsize
-    return size_value(round((total - free) / gb, 1), round(total / gb, 1))
+    return size_value(round(usage.used / gb, 1), round(usage.total / gb, 1))
 
 
 def get_arch():
@@ -500,13 +555,21 @@ def get_arch():
 
 
 def get_uptime():
-    parts = read("/proc/uptime").split()
-    if not parts:
-        return "?"
-    try:
-        seconds = int(float(parts[0]))
-    except ValueError:
-        return "?"
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            seconds = int(ctypes.windll.kernel32.GetTickCount64() / 1000)
+        except Exception:
+            return "?"
+    else:
+        parts = read("/proc/uptime").split()
+        if not parts:
+            return "?"
+        try:
+            seconds = int(float(parts[0]))
+        except ValueError:
+            return "?"
     days, remainder = divmod(seconds, 86400)
     hours, remainder = divmod(remainder, 3600)
     output = []
@@ -523,10 +586,16 @@ def get_cpu_cores():
 
 
 def get_shell():
+    if sys.platform == "win32":
+        return Path(os.environ.get("COMSPEC") or "cmd.exe").name
     return Path(os.environ.get("SHELL") or "?").name or "?"
 
 
 def get_terminal():
+    if sys.platform == "win32":
+        if os.environ.get("WT_SESSION"):
+            return "Windows Terminal"
+        return os.environ.get("TERM_PROGRAM") or os.environ.get("TERM") or "cmd"
     for key in ("TERM_PROGRAM", "TERMINAL_PROG", "TERM"):
         value = os.environ.get(key)
         if value:
@@ -535,6 +604,8 @@ def get_terminal():
 
 
 def get_de():
+    if sys.platform == "win32":
+        return "Windows Shell"
     return (
         os.environ.get("XDG_CURRENT_DESKTOP")
         or os.environ.get("DESKTOP_SESSION")
@@ -543,6 +614,8 @@ def get_de():
 
 
 def get_wm():
+    if sys.platform == "win32":
+        return "DWM"
     text = command(["wmctrl", "-m"], timeout=1)
     for line in text.splitlines():
         if line.lower().startswith("name:"):
@@ -551,12 +624,23 @@ def get_wm():
 
 
 def get_packages():
+    if sys.platform == "win32":
+        for argv in (("winget", "list"), ("choco", "list", "-l")):
+            if not shutil.which(argv[0]):
+                continue
+            output = command(argv, timeout=8)
+            if output:
+                count = len([line for line in output.splitlines() if line.strip()])
+                if count > 0:
+                    return f"{argv[0]}: {count}"
+        return "?"
     managers = (
         ("pacman", ("pacman", "-Qq")),
         ("dpkg", ("dpkg-query", "-f", "${binary:Package}\\n", "-W")),
         ("apk", ("apk", "info")),
         ("rpm", ("rpm", "-qa")),
         ("flatpak", ("flatpak", "list", "--app")),
+        ("snap", ("snap", "list")),
     )
     counts = []
     for name, argv in managers:
@@ -564,18 +648,51 @@ def get_packages():
             continue
         output = command(argv, timeout=3)
         if output:
-            counts.append(f"{name}: {len(output.splitlines())}")
+            count = len(output.splitlines())
+            if name == "snap":
+                count = max(0, count - 1)
+            if count:
+                counts.append(f"{name}: {count}")
     return ", ".join(counts) or "?"
 
 
 def get_processes():
+    if sys.platform == "win32":
+        out = command(["tasklist", "/fo", "csv", "/nh"], timeout=3)
+        if out:
+            return str(len([line for line in out.splitlines() if line.strip()]))
+        return "?"
     try:
-        return str(sum(entry.name.isdigit() for entry in os.scandir("/proc")))
+        return str(len([1 for p in Path("/proc").iterdir() if p.name.isdigit()]))
     except OSError:
         return "?"
 
 
 def get_battery():
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            class SYSTEM_POWER_STATUS(ctypes.Structure):
+                _fields_ = [
+                    ("ACLineStatus", ctypes.c_byte),
+                    ("BatteryFlag", ctypes.c_byte),
+                    ("BatteryLifePercent", ctypes.c_byte),
+                    ("SystemStatusFlag", ctypes.c_byte),
+                    ("BatteryLifeTime", ctypes.c_ulong),
+                    ("BatteryFullLifeTime", ctypes.c_ulong),
+                ]
+
+            status = SYSTEM_POWER_STATUS()
+            if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(status)):
+                return "?"
+            percent = status.BatteryLifePercent
+            if percent == 255:
+                return "AC"
+            state = "Charging" if status.ACLineStatus == 1 else "Discharging"
+            return f"{percent}% ({state})"
+        except Exception:
+            return "?"
     for path in sorted(Path("/sys/class/power_supply").glob("BAT*")):
         capacity = read(path / "capacity").strip()
         if not capacity:
@@ -633,6 +750,14 @@ def get_temperature():
 
 
 def get_resolution():
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            user32 = ctypes.windll.user32
+            return f"{user32.GetSystemMetrics(0)}x{user32.GetSystemMetrics(1)}"
+        except Exception:
+            return "?"
     output = command(["xrandr", "--current"], timeout=2)
     for line in output.splitlines():
         if " connected" not in line:
@@ -646,6 +771,33 @@ def get_resolution():
 
 
 def get_swap():
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            class MEMORYSTATUSEX(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            stat = MEMORYSTATUSEX()
+            stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
+                total = stat.ullTotalPageFile / 1024**3
+                avail = stat.ullAvailPageFile / 1024**3
+                if total <= 0:
+                    return "none"
+                return size_value(round(total - avail, 1), round(total, 1))
+        except Exception:
+            return "?"
     values = {}
     for line in read("/proc/meminfo").splitlines():
         if ":" in line:
@@ -663,6 +815,30 @@ def get_swap():
 
 def get_disks():
     entries = []
+    if sys.platform == "win32":
+        import ctypes
+        import string
+
+        bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+        for letter in string.ascii_uppercase:
+            if not bitmask & 1:
+                bitmask >>= 1
+                continue
+            bitmask >>= 1
+            drive = f"{letter}:\\"
+            try:
+                usage = shutil.disk_usage(drive)
+            except OSError:
+                continue
+            gb = 1024**3
+            value = size_value(round(usage.used / gb, 1), round(usage.total / gb, 1))
+            entries.append(
+                f"{drive} {value['used']}/{value['total']} GiB ({value['percent']}%)"
+            )
+            if len(entries) == 5:
+                break
+        return ", ".join(entries) or "?"
+
     seen = set()
     for line in read("/proc/mounts").splitlines():
         parts = line.split()
@@ -672,15 +848,13 @@ def get_disks():
         if mount in seen or mount.startswith(("/proc", "/sys", "/dev")):
             continue
         try:
-            st = os.statvfs(mount)
+            usage = shutil.disk_usage(mount)
         except OSError:
             continue
         gb = 1024**3
-        total = st.f_blocks * st.f_frsize
-        free = st.f_bavail * st.f_frsize
-        if not total:
+        if not usage.total:
             continue
-        value = size_value(round((total - free) / gb, 1), round(total / gb, 1))
+        value = size_value(round(usage.used / gb, 1), round(usage.total / gb, 1))
         entries.append(
             f"{mount}: {value['used']}/{value['total']} GiB ({value['percent']}%)"
         )
@@ -691,6 +865,8 @@ def get_disks():
 
 
 def get_network():
+    if sys.platform == "win32":
+        return get_local_ip() or "?"
     for line in read("/proc/net/route").splitlines()[1:]:
         parts = line.split()
         if len(parts) > 1 and parts[1] == "00000000":
@@ -699,7 +875,85 @@ def get_network():
 
 
 def get_locale():
-    return os.environ.get("LANG") or os.environ.get("LC_ALL") or "?"
+    return (
+        os.environ.get("LANG")
+        or os.environ.get("LC_ALL")
+        or os.environ.get("LANGUAGE")
+        or "?"
+    )
+
+
+def get_motherboard():
+    if sys.platform == "win32":
+        out = command(
+            ["wmic", "baseboard", "get", "Manufacturer,Product", "/value"], timeout=2
+        )
+        vals = dict(re.findall(r"(\w+)=(.+)", out))
+        text = " ".join(v.strip() for v in vals.values() if v.strip())
+        return text or "?"
+    vendor = read("/sys/devices/virtual/dmi/id/board_vendor").strip()
+    name = read("/sys/devices/virtual/dmi/id/board_name").strip()
+    return " ".join(x for x in (vendor, name) if x) or "?"
+
+
+def get_bios():
+    if sys.platform == "win32":
+        out = command(
+            ["wmic", "bios", "get", "SMBIOSBIOSVersion,Manufacturer", "/value"],
+            timeout=2,
+        )
+        vals = dict(re.findall(r"(\w+)=(.+)", out))
+        text = " ".join(v.strip() for v in vals.values() if v.strip())
+        return text or "?"
+    vendor = read("/sys/devices/virtual/dmi/id/bios_vendor").strip()
+    version = read("/sys/devices/virtual/dmi/id/bios_version").strip()
+    return " ".join(x for x in (vendor, version) if x) or "?"
+
+
+def get_display():
+    if sys.platform == "win32":
+        return get_resolution()
+    output = command(["xrandr", "--current"], timeout=2)
+    m = re.search(r"(\d{3,5}x\d{3,5}).*?(\d+\.\d+\*)", output)
+    if m:
+        return f"{m.group(1)} @ {m.group(2).rstrip('*')}Hz"
+    return get_resolution()
+
+
+def get_audio():
+    if sys.platform == "win32":
+        out = command(["wmic", "sounddev", "get", "Name", "/value"], timeout=2)
+        names = [v.strip() for k, v in re.findall(r"(\w+)=(.+)", out) if v.strip()]
+        return names[0] if names else "?"
+    if shutil.which("pactl"):
+        out = command(["pactl", "info"], timeout=2)
+        m = re.search(r"Default Sink: (.+)", out)
+        if m:
+            return m.group(1).strip()
+    return "?"
+
+
+def get_bluetooth():
+    if sys.platform == "win32":
+        out = command(
+            ["powershell", "-NoProfile", "-Command", "Get-PnpDevice -Class Bluetooth | Select-Object -First 1 -ExpandProperty FriendlyName"],
+            timeout=4,
+        )
+        return out.splitlines()[0].strip() if out.strip() else "off"
+    if not shutil.which("bluetoothctl"):
+        return "off"
+    out = command(["bluetoothctl", "show"], timeout=2)
+    powered = re.search(r"Powered: (yes|no)", out)
+    return "on" if powered and powered.group(1) == "yes" else "off"
+
+
+def get_power():
+    if sys.platform == "win32":
+        return get_battery()
+    gov = read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor").strip()
+    if gov:
+        return gov
+    return get_battery()
 
 
 def get_timezone():
@@ -721,24 +975,41 @@ def get_date():
 def get_loadavg():
     try:
         one, five, fifteen = os.getloadavg()
-    except OSError:
-        return "?"
-    return f"{one:.2f} {five:.2f} {fifteen:.2f}"
+        return f"{one:.2f} {five:.2f} {fifteen:.2f}"
+    except (OSError, AttributeError):
+        pass
+    if sys.platform == "win32":
+        out = command(["wmic", "cpu", "get", "LoadPercentage", "/value"], timeout=2)
+        m = re.search(r"LoadPercentage=(\d+)", out)
+        if m:
+            return f"{m.group(1)}% cpu load"
+    return "?"
 
 
 def get_boot_time():
+    from datetime import datetime
+
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            ms = ctypes.windll.kernel32.GetTickCount64()
+            ts = time.time() - (ms / 1000)
+            return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            return "?"
     text = read("/proc/stat")
     for line in text.splitlines():
         if line.startswith("btime "):
             value = line.split(None, 1)[1].strip()
             if value.isdigit():
-                from datetime import datetime
-
                 return datetime.fromtimestamp(int(value)).strftime("%Y-%m-%d %H:%M")
     return "?"
 
 
 def get_init():
+    if sys.platform == "win32":
+        return "System"
     comm = read("/proc/1/comm").strip()
     if comm:
         return comm
@@ -780,6 +1051,12 @@ GETTERS = {
     "locale": get_locale,
     "timezone": get_timezone,
     "date": get_date,
+    "motherboard": get_motherboard,
+    "bios": get_bios,
+    "display": get_display,
+    "audio": get_audio,
+    "bluetooth": get_bluetooth,
+    "power": get_power,
 }
 
 
@@ -803,49 +1080,54 @@ def collect(fields, cache_ttl=300, use_cache=True):
     """Gather modules in parallel; returns (data, timings_ms)."""
 
     timings = {}
+    lock = threading.Lock()
 
     def fetch(key):
         start = time.perf_counter()
-        if is_command_field(key):
-            spec = parse_command_field(key)
-            ttl = cache_ttl if use_cache else 0
-            cache_name = f"cmd-{spec['key']}-{abs(hash(spec['cmd']))}"
-            if ttl:
-                cached = cache_read(cache_name, ttl)
-                if cached is not None:
-                    timings[key] = (time.perf_counter() - start) * 1000
-                    return cached
-            value = run_command_field(spec["cmd"])
-            if ttl and value != "?":
-                cache_write(cache_name, value)
-            timings[key] = (time.perf_counter() - start) * 1000
-            return value
-
-        ttl = min(cache_ttl, SLOW_FIELDS.get(key, 0)) if use_cache else 0
-        if ttl:
-            cached = cache_read(key, ttl)
-            if cached is not None:
-                timings[key] = (time.perf_counter() - start) * 1000
-                return cached
         try:
-            value = GETTERS[key]()
-        except Exception:
-            value = "?"
-        if ttl and value != "?":
-            cache_write(key, value)
-        timings[key] = (time.perf_counter() - start) * 1000
-        return value
+            if is_command_field(key):
+                spec = parse_command_field(key)
+                ttl = cache_ttl if use_cache else 0
+                cache_name = f"cmd-{spec['key']}-{abs(hash(spec['cmd']))}"
+                if ttl:
+                    cached = cache_read(cache_name, ttl)
+                    if cached is not None:
+                        return cached
+                value = run_command_field(spec["cmd"])
+                if ttl and value != "?":
+                    cache_write(cache_name, value)
+                return value
+
+            ttl = min(cache_ttl, SLOW_FIELDS.get(key, 0)) if use_cache else 0
+            if ttl:
+                cached = cache_read(key, ttl)
+                if cached is not None:
+                    return cached
+            try:
+                value = GETTERS[key]()
+            except Exception:
+                value = "?"
+            if ttl and value != "?":
+                cache_write(key, value)
+            return value
+        finally:
+            with lock:
+                timings[key] = (time.perf_counter() - start) * 1000
 
     fields = list(dict.fromkeys(fields))
-    if len(fields) < 2:
-        data = {key: fetch(key) for key in fields}
-        return data, timings
+    if not fields:
+        return {}, timings
+    if len(fields) == 1:
+        key = fields[0]
+        return {key: fetch(key)}, timings
 
     data = {}
-    lock = threading.Lock()
-    workers_count = min(8, len(fields))
+    slow = [k for k in fields if k in SLOW_FIELDS or is_command_field(k)]
+    fast = [k for k in fields if k not in slow]
+    ordered = fast + slow
+    workers_count = min(8, len(ordered))
     groups = [[] for _ in range(workers_count)]
-    for index, key in enumerate(fields):
+    for index, key in enumerate(ordered):
         groups[index % workers_count].append(key)
 
     def worker(keys):
