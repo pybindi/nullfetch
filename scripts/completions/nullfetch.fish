@@ -35,5 +35,5 @@ complete -c nullfetch -l format -x -a 'text json csv markdown oneline' -d 'Outpu
 complete -c nullfetch -l no-cache -d 'Ignore cached values'
 complete -c nullfetch -l no-network -d 'Disable network modules'
 complete -c nullfetch -l timing -d 'Print collection time'
-complete -c nullfetch -s o -l only -x -a 'user host os kernel arch uptime cpu cpu_cores gpu ram swap disk disks network local_ip public_ip battery temperature resolution shell terminal de wm packages processes locale timezone date' -d 'Show only these fields'
+complete -c nullfetch -s o -l only -x -a 'user host os kernel arch uptime boot_time loadavg cpu cpu_cores gpu ram swap disk disks network local_ip public_ip battery temperature resolution shell terminal de wm packages processes init locale timezone date motherboard bios display audio bluetooth power' -d 'Show only these fields'
 complete -c nullfetch -l json -d 'Print system info as JSON'

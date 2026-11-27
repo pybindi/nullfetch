@@ -130,9 +130,10 @@ Print system information as JSON.
 .SH FIELDS
 Default: user, host, os, kernel, cpu, gpu, ram, disk.
 .br
-Extra: arch, uptime, cpu_cores, swap, disks, network, local_ip, public_ip,
-battery, temperature, resolution, shell, terminal, de, wm, packages, processes,
-locale, timezone, date.
+Extra: arch, uptime, boot_time, loadavg, cpu_cores, swap, disks, network,
+local_ip, public_ip, battery, temperature, resolution, shell, terminal, de, wm,
+packages, processes, init, locale, timezone, date, motherboard, bios, display,
+audio, bluetooth, power.
 .SH EXAMPLES
 .TP
 .B nullfetch \-\-only cpu,ram

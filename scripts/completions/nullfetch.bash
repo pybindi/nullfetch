@@ -2,7 +2,7 @@ _nullfetch() {
     local cur prev
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    local fields="user host os kernel arch uptime cpu cpu_cores gpu ram swap disk disks network local_ip public_ip battery temperature resolution shell terminal de wm packages processes locale timezone date"
+    local fields="user host os kernel arch uptime boot_time loadavg cpu cpu_cores gpu ram swap disk disks network local_ip public_ip battery temperature resolution shell terminal de wm packages processes init locale timezone date motherboard bios display audio bluetooth power"
     local themes="default mono light neon dark nord gruvbox dracula tokyo solarized matrix"
     local modes="auto blocks ascii kitty iterm chafa viu jp2 img2txt timg sixel"
 
