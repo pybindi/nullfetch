@@ -11,12 +11,28 @@ pub struct RenderedImage {
 }
 
 fn term_size() -> (usize, usize) {
+    #[cfg(unix)]
     if let Ok(out) = Command::new("stty").args(["size"]).output() {
         let s = String::from_utf8_lossy(&out.stdout);
         let mut it = s.split_whitespace();
         let rows = it.next().and_then(|x| x.parse().ok()).unwrap_or(24usize);
         let cols = it.next().and_then(|x| x.parse().ok()).unwrap_or(80usize);
         return (cols, rows);
+    }
+    if let Ok(out) = Command::new("sh").args(["-c", "echo ${COLUMNS:-80} ${LINES:-24}"]).output() {
+        let s = String::from_utf8_lossy(&out.stdout);
+        let mut it = s.split_whitespace();
+        let cols = it.next().and_then(|x| x.parse().ok()).unwrap_or(80usize);
+        let rows = it.next().and_then(|x| x.parse().ok()).unwrap_or(24usize);
+        if cols > 0 && rows > 0 { return (cols, rows); }
+    }
+    #[cfg(windows)]
+    if let Ok(out) = Command::new("powershell").args(["-NoProfile","-Command","$h=$Host.UI.RawUI.WindowSize; \"$($h.Width) $($h.Height)\""]).output() {
+        let s = String::from_utf8_lossy(&out.stdout);
+        let mut it = s.split_whitespace();
+        let cols = it.next().and_then(|x| x.parse().ok()).unwrap_or(80usize);
+        let rows = it.next().and_then(|x| x.parse().ok()).unwrap_or(24usize);
+        if cols > 0 && rows > 0 { return (cols, rows); }
     }
     (80,24)
 }
@@ -147,7 +163,12 @@ pub fn render_iterm(path:&str, cols:usize, lines:usize) -> Result<RenderedImage,
     Ok(RenderedImage{width:cols, lines:out})
 }
 
-fn which(cmd:&str) -> bool { Command::new("sh").args(["-c", &format!("command -v {cmd} >/dev/null 2>&1")]).status().map(|s| s.success()).unwrap_or(false) }
+fn which(cmd:&str) -> bool {
+    #[cfg(windows)]
+    { return Command::new("where").arg(cmd).output().map(|o| o.status.success()).unwrap_or(false); }
+    #[cfg(not(windows))]
+    { Command::new("sh").args(["-c", &format!("command -v {cmd} >/dev/null 2>&1")]).status().map(|s| s.success()).unwrap_or(false) }
+}
 
 pub fn render_external(mode:&str, path:&str, cols:usize, lines:usize) -> Result<RenderedImage,String> {
     let (cmd, args): (&str, Vec<String>) = match mode {

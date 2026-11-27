@@ -1,0 +1,16 @@
+# Template file for 'nullfetch'
+pkgname=nullfetch
+version=3.0.0
+revision=1
+build_style=cargo
+short_desc="Fast system fetch tool"
+maintainer="pybindi <sungunboom@gmail.com>"
+license="MIT"
+homepage="https://github.com/pybindi/nullfetch"
+distfiles="https://github.com/pybindi/nullfetch/archive/refs/tags/v${version}.tar.gz"
+checksum=SKIP
+
+post_install() {
+	vlicense LICENSE
+	vman nullfetch.1
+}

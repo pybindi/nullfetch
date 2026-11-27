@@ -3,29 +3,89 @@ name: release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  deb:
-    runs-on: ubuntu-latest
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            archive: tar.gz
+            cross: true
+          - os: macos-13
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          - os: macos-14
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: zip
+
     steps:
       - uses: actions/checkout@v4
-
-      - name: Собрать .deb
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install cross deps
+        if: matrix.cross
         run: |
-          chmod +x scripts/build-deb.sh
-          ./scripts/build-deb.sh
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          mkdir -p .cargo
+          cat >> .cargo/config.toml <<'CFG'
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
+CFG
+      - name: Build
+        shell: bash
+        run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          name=nullfetch-${{ github.ref_name }}-${{ matrix.target }}
+          mkdir -p dist/pkg
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            cp target/${{ matrix.target }}/release/nullfetch.exe dist/pkg/
+            cp README.md LICENSE nullfetch.1 nullfetch.bat dist/pkg/
+            (cd dist/pkg && 7z a ../${name}.zip *)
+          else
+            cp target/${{ matrix.target }}/release/nullfetch dist/pkg/
+            cp README.md LICENSE nullfetch.1 dist/pkg/
+            tar -C dist/pkg -czf dist/${name}.tar.gz .
+          fi
+          (cd dist && sha256sum ${name}.${{ matrix.archive }} > ${name}.${{ matrix.archive }}.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nullfetch-${{ matrix.target }}
+          path: dist/*
 
-      - name: Create checksums
-        run: sha256sum dist/*.deb > dist/SHA256SUMS
-
-      - name: Приложить к релизу
-        uses: softprops/action-gh-release@v2
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum *.tar.gz *.zip > SHA256SUMS || true
+      - uses: softprops/action-gh-release@v2
         with:
           name: nullfetch ${{ github.ref_name }}
           generate_release_notes: true
-          files: |
-            dist/*.deb
-            dist/SHA256SUMS
+          files: dist/*

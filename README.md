@@ -4,13 +4,12 @@
 
 # nullfetch
 
-**Fast system fetch for Linux, written in Rust.**  
-Zero runtime dependencies. Logos, images, presets, command modules, script-friendly output.
+**Fast system fetch, written in Rust.**  
+Linux, macOS, Windows. Zero runtime dependencies. Logos, images, presets, command modules, script-friendly output.
 
 <p>
   <a href="https://github.com/pybindi/nullfetch/releases"><img src="https://img.shields.io/github/v/release/pybindi/nullfetch?style=for-the-badge&color=478061&label=release" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2ea44f?style=for-the-badge" alt="MIT License"></a>
-  <a href="#"><img src="https://img.shields.io/badge/platform-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux"></a>
   <a href="#"><img src="https://img.shields.io/badge/runtime_deps-zero-brightgreen?style=for-the-badge" alt="Zero runtime deps"></a>
 </p>
 
@@ -21,9 +20,9 @@ Zero runtime dependencies. Logos, images, presets, command modules, script-frien
 ## What it is
 
 `nullfetch` prints system info in your terminal, fast.  
-Version 3 is a Rust rewrite focused on startup speed and practical output.
+v3 is Rust-native and aimed at quick startup with practical modules.
 
-## Benchmarks (this machine, warmup, `NO_COLOR=1`)
+## Benchmarks (Linux reference machine, warmup, `NO_COLOR=1`)
 
 | Command | Median | Min |
 |---|---:|---:|
@@ -35,20 +34,77 @@ Results depend on hardware, OS, cache, and selected modules.
 
 ## Install
 
+### Cargo (all platforms with Rust)
+
+```bash
+cargo install --git https://github.com/pybindi/nullfetch.git
+```
+
 ### From source
 
 ```bash
 git clone https://github.com/pybindi/nullfetch.git
 cd nullfetch
 cargo build --release
-install -Dm755 target/release/nullfetch ~/.local/bin/nullfetch
 ```
 
-Or use:
+Linux/macOS:
 
 ```bash
+install -Dm755 target/release/nullfetch ~/.local/bin/nullfetch
+# or
 ./install.sh
 ```
+
+Windows (PowerShell):
+
+```powershell
+cargo build --release
+Copy-Item .\target\release\nullfetch.exe $env:USERPROFILE\.local\bin\nullfetch.exe
+```
+
+Or run `nullfetch.bat` after build.
+
+### Arch Linux (PKGBUILD)
+
+```bash
+git clone https://github.com/pybindi/nullfetch.git
+cd nullfetch
+makepkg -si
+```
+
+### Debian/Ubuntu (.deb)
+
+```bash
+./scripts/build-deb.sh
+sudo dpkg -i dist/nullfetch_*_*.deb
+```
+
+### Void Linux (XBPS template)
+
+Template is in `packaging/xbps/template`. Copy it into your `void-packages/srcpkgs/nullfetch/template`, set checksum, then:
+
+```bash
+./xbps-src pkg nullfetch
+sudo xbps-install -R hostdir/binpkgs nullfetch
+```
+
+### Homebrew (formula template)
+
+Template: `packaging/homebrew/nullfetch.rb`. For a local install from formula:
+
+```bash
+brew install --build-from-source ./packaging/homebrew/nullfetch.rb
+```
+
+### Prebuilt binaries
+
+Release workflow builds archives for:
+- Linux x86_64/aarch64
+- macOS x86_64/aarch64
+- Windows x86_64
+
+Download from GitHub Releases.
 
 ## Usage
 
@@ -70,61 +126,36 @@ nullfetch --timing
 nullfetch --only os,command:git:git\ branch\ --show-current
 ```
 
-In config: `command:<name>:<cmd>`.
-
 ## Modules
 
 **Default:** `user host os kernel cpu gpu ram disk`
 
 **Extra:** `arch uptime boot_time loadavg cpu_cores swap disks network local_ip public_ip battery temperature resolution shell terminal de wm packages processes init locale timezone date motherboard bios display audio bluetooth power`
 
-```bash
-nullfetch --list-fields
-nullfetch --list-presets
-```
-
 ## Config
 
-Config path: `~/.config/nullfetch/config.json` (or `$XDG_CONFIG_HOME/nullfetch/config.json`).
+Config path: `~/.config/nullfetch/config.json` (or `$XDG_CONFIG_HOME/nullfetch/config.json` on Unix; `%APPDATA%\nullfetch\config.json` on Windows).
 
 ```bash
 nullfetch --init-config
 nullfetch --show-config
 nullfetch --set theme=gruvbox
-nullfetch --set modules=os,cpu,ram,command:git:git\ branch\ --show-current
 nullfetch --reset-config
 ```
-
-CLI flags override config.
 
 ## Output formats
 
 `text`, `json`, `csv`, `markdown`, `oneline`.
-
-Default `--json` keeps the original 8 fields for compatibility unless fields are selected explicitly.
 
 ## Images / logos
 
 ```bash
 nullfetch --logo arch
 nullfetch --image ~/wallpaper.png --image-mode blocks
-nullfetch --image ~/wallpaper.png --image-mode kitty
 nullfetch --list-image-modes
 ```
 
-Built-in image modes include `blocks`, `ascii`, `kitty`, `iterm`; external converters are used when available (`chafa`, `viu`, `jp2a`, `img2txt`, `timg`).
-
-## Project layout
-
-```text
-.
-├── src/            # Rust source
-├── tests/          # CLI smoke tests
-├── scripts/        # completions, packaging helpers
-├── debian/         # Debian packaging
-├── PKGBUILD        # Arch packaging
-└── nullfetch.1     # man page
-```
+Modes: `auto blocks ascii kitty iterm chafa viu jp2 img2txt timg sixel` (external modes use installed tools when available).
 
 ## Development
 

@@ -233,6 +233,8 @@ fn get_logo(opts: &Opts) -> (Vec<String>, bool) {
     if let Some(real)=aliases.get(name.as_str()) {
         for (k,v) in &map { if k==real { return (v.lines().map(|l| l.to_string()).collect(), false); } }
     }
+    let fallback = match std::env::consts::OS { "macos" => "macos", "windows" => "windows", _ => "linux" };
+    for (k,v) in &map { if *k == fallback { return (v.lines().map(|l| l.to_string()).collect(), false); } }
     for (k,v) in &map { if *k == "linux" { return (v.lines().map(|l| l.to_string()).collect(), false); } }
     (vec![], false)
 }
@@ -316,13 +318,26 @@ fn render_text(fields: &[String], data: &BTreeMap<String, modules::Value>, opts:
 }
 
 fn term_width() -> (usize, usize) {
-    std::process::Command::new("stty").args(["size"]).output().ok().and_then(|o| {
-        let s = String::from_utf8_lossy(&o.stdout);
+    #[cfg(unix)]
+    if let Ok(out) = std::process::Command::new("stty").args(["size"]).output() {
+        let s = String::from_utf8_lossy(&out.stdout);
         let mut it = s.split_whitespace();
-        let rows = it.next()?.parse().ok()?;
-        let cols = it.next()?.parse().ok()?;
-        Some((cols, rows))
-    }).unwrap_or((80,24))
+        let rows = it.next().and_then(|x| x.parse().ok()).unwrap_or(0usize);
+        let cols = it.next().and_then(|x| x.parse().ok()).unwrap_or(0usize);
+        if cols > 0 && rows > 0 { return (cols, rows); }
+    }
+    if let (Ok(c), Ok(r)) = (std::env::var("COLUMNS"), std::env::var("LINES")) {
+        if let (Ok(c), Ok(r)) = (c.parse::<usize>(), r.parse::<usize>()) { if c>0 && r>0 { return (c,r); } }
+    }
+    #[cfg(windows)]
+    if let Ok(out) = std::process::Command::new("powershell").args(["-NoProfile","-Command","$h=$Host.UI.RawUI.WindowSize; \"$($h.Width) $($h.Height)\""]).output() {
+        let s = String::from_utf8_lossy(&out.stdout);
+        let mut it = s.split_whitespace();
+        let cols = it.next().and_then(|x| x.parse().ok()).unwrap_or(80usize);
+        let rows = it.next().and_then(|x| x.parse().ok()).unwrap_or(24usize);
+        if cols > 0 && rows > 0 { return (cols, rows); }
+    }
+    (80,24)
 }
 
 fn print_json(fields: &[String], data: &BTreeMap<String, modules::Value>) {

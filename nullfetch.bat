@@ -1,15 +1,14 @@
 @echo off
 setlocal
-set "SCRIPT=%~dp0nullfetch.py"
-where py >nul 2>nul
-if %errorlevel%==0 (
-  py -3 "%SCRIPT%" %*
+set "BIN=%~dp0nullfetch.exe"
+if exist "%BIN%" (
+  "%BIN%" %*
   exit /b %errorlevel%
 )
-where python >nul 2>nul
-if %errorlevel%==0 (
-  python "%SCRIPT%" %*
+set "BIN=%~dp0target\release\nullfetch.exe"
+if exist "%BIN%" (
+  "%BIN%" %*
   exit /b %errorlevel%
 )
-echo nullfetch: Python 3 not found. Install Python from https://python.org/downloads/ 1>&2
+echo nullfetch: binary not found. Build with: cargo build --release 1>&2
 exit /b 1
