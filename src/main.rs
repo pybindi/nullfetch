@@ -5,7 +5,7 @@ mod render;
 
 use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Instant;
@@ -166,6 +166,39 @@ fn collect(fields: &[String]) -> (BTreeMap<String, modules::Value>, std::collect
     (data, timings)
 }
 
+fn find_python_cli() -> Option<std::path::PathBuf> {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let p = dir.join("nullfetch.py");
+            if p.exists() { return Some(p); }
+            let share = dir.join("../share/nullfetch/nullfetch.py");
+            if share.exists() { return Some(share); }
+        }
+    }
+    for p in [
+        "/usr/share/nullfetch/nullfetch.py",
+        "/usr/local/share/nullfetch/nullfetch.py",
+    ] {
+        let pb = std::path::PathBuf::from(p);
+        if pb.exists() { return Some(pb); }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        let p = cwd.join("nullfetch.py");
+        if p.exists() { return Some(p); }
+    }
+    None
+}
+
+fn delegate_to_python(args: &[String]) -> ! {
+    let Some(script) = find_python_cli() else {
+        fail("this feature needs Python nullfetch.py fallback, but it was not found");
+    };
+    let mut cmd = Command::new("python3");
+    cmd.arg(script).args(args);
+    let status = cmd.status().unwrap_or_else(|e| fail(&format!("cannot run python3 fallback: {e}")));
+    std::process::exit(status.code().unwrap_or(1));
+}
+
 fn get_logo(opts: &Opts) -> Vec<String> {
     if !opts.logo || opts.logo_name=="none" { return vec![]; }
     if let Some(path) = &opts.logo_file {
@@ -173,18 +206,13 @@ fn get_logo(opts: &Opts) -> Vec<String> {
         if let Ok(s)=std::fs::read_to_string(p) { return s.lines().map(|l| l.to_string()).collect(); }
         return vec![];
     }
-    let name = if opts.logo_name=="auto" {
-        let id = modules::detect_distro_id();
-        id
-    } else { opts.logo_name.clone() };
+    let name = if opts.logo_name=="auto" { modules::detect_distro_id() } else { opts.logo_name.clone() };
     let map = logos::logos();
     for (k,v) in &map { if *k == name { return v.lines().map(|l| l.to_string()).collect(); } }
-    // alias
     let aliases = logos::aliases();
     if let Some(real)=aliases.get(name.as_str()) {
         for (k,v) in &map { if k==real { return v.lines().map(|l| l.to_string()).collect(); } }
     }
-    // fallback
     for (k,v) in &map { if *k == "linux" { return v.lines().map(|l| l.to_string()).collect(); } }
     vec![]
 }
@@ -275,9 +303,18 @@ fn print_help() {
     println!("nullfetch {VERSION} - PC info\n\nUsage:\n  nullfetch [options]\n\nOptions:\n  -h, --help          show help\n      --version       show version\n      --no-logo       hide logo\n      --logo NAME     logo name or auto/none\n      --logo-file F   custom ASCII logo file\n      --accent COLOR  accent color\n      --color MODE    auto/always/never\n      --no-color      disable color\n      --theme NAME    theme\n      --compact       compact layout\n      --all           all modules\n      --preset NAME   minimal/full/dev/server\n      --doctor        diagnostics\n  -o, --only FIELDS   comma separated fields\n      --format F      text,json,csv,markdown,oneline\n      --json          JSON output\n      --oneline       one line\n      --separator S   separator\n      --bar-width N   bar width\n      --bar-style S   blocks/ascii/arrows/dots/lines\n      --timing        timing to stderr\n      --no-cache      ignore cache\n      --no-network    skip public_ip\n      --list-fields   list fields\n      --list-presets  list presets\n      --list-logos    list logos\n      --list-image-modes list image modes\n      --save-config   save defaults\n      --show-config   show config\n      --reset-config  reset config\n      --init-config   write example config\n      --set K=V       set config\n      --config FILE   config file\n\nFields:\n  {} (default)\n  {} (extra)\n  command:<name>:<cmd> (custom)", FIELDS.join(" "), EXTRA_FIELDS.join(" "));
 }
 
+fn needs_python_fallback(opts: &Opts) -> bool {
+    opts.image.is_some()
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut opts = parse_args(&args);
+
+    // full parity for image rendering via Python implementation
+    if needs_python_fallback(&opts) {
+        delegate_to_python(&args);
+    }
 
     if opts.help { print_help(); return ExitCode::SUCCESS; }
     if opts.version { println!("nullfetch {VERSION}"); return ExitCode::SUCCESS; }
@@ -291,10 +328,8 @@ fn main() -> ExitCode {
     if opts.init_config { let p=config::config_path(opts.config_file.as_deref()); if p.exists() { fail(&format!("config already exists: {}; use --set or --reset-config", p.display())); } let sample=json!({"logo":"auto","theme":"default","color":"auto","modules":FIELDS,"separator":": ","bar-style":"blocks","bar-width":12}); if let Err(e)=config::write_config(&p,&sample){fail(&e)} println!("example config written: {}", p.display()); return ExitCode::SUCCESS; }
     if let Some(sv)=opts.set_value.clone() { if let Err(e)=set_config(&opts, &sv){fail(&e)} return ExitCode::SUCCESS; }
 
-    // config defaults
     let cfg_path = config::config_path(opts.config_file.as_deref());
     if let Ok(cfg)=config::load_config(&cfg_path) {
-        // apply config, then CLI already parsed? simple: reparse config+args
         let mut merged: Vec<String> = vec![];
         if let Some(obj)=cfg.as_object() {
             for (k,v) in obj {
@@ -306,6 +341,7 @@ fn main() -> ExitCode {
         }
         merged.extend(args.clone());
         opts = parse_args(&merged);
+        if needs_python_fallback(&opts) { delegate_to_python(&args); }
     }
 
     apply_preset(&mut opts);
