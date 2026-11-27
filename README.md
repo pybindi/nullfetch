@@ -91,11 +91,23 @@ sudo xbps-install -R hostdir/binpkgs nullfetch
 
 ### Homebrew (formula template)
 
-Template: `packaging/homebrew/nullfetch.rb`. For a local install from formula:
+Template: `packaging/homebrew/nullfetch.rb`.
 
 ```bash
 brew install --build-from-source ./packaging/homebrew/nullfetch.rb
 ```
+
+### Scoop (Windows, template)
+
+Template: `packaging/scoop/nullfetch.json`.
+
+```powershell
+scoop install ./packaging/scoop/nullfetch.json
+```
+
+### Winget / Chocolatey
+
+Submission templates are in `packaging/winget/` and `packaging/chocolatey/`. Replace version/checksum before publishing.
 
 ### Prebuilt binaries
 
@@ -134,13 +146,25 @@ nullfetch --only os,command:git:git\ branch\ --show-current
 
 ## Config
 
-Config path: `~/.config/nullfetch/config.json` (or `$XDG_CONFIG_HOME/nullfetch/config.json` on Unix; `%APPDATA%\nullfetch\config.json` on Windows).
+Config path: `~/.config/nullfetch/config.json` / `config.jsonc` (or `$XDG_CONFIG_HOME/...` on Unix; `%APPDATA%\nullfetch\...` on Windows).
 
 ```bash
-nullfetch --init-config
+nullfetch --gen-config
 nullfetch --show-config
 nullfetch --set theme=gruvbox
 nullfetch --reset-config
+```
+
+JSONC is supported. Modules can be strings or objects:
+
+```jsonc
+{
+  "modules": [
+    "os",
+    { "type": "cpu", "key": "CPU", "format": "{value}", "keyColor": "#7aa2f7" },
+    { "type": "command:git:git branch --show-current", "key": "Git" }
+  ]
+}
 ```
 
 ## Output formats

@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub enum Value {
     Text(String),
     Size { used: f64, total: f64, percent: i64 },
+    Info { text: String, fields: std::collections::BTreeMap<String, String> },
     None,
 }
 
@@ -15,6 +16,12 @@ pub fn value_to_json(v: &Value) -> J {
     match v {
         Value::Text(s) => json!(s),
         Value::Size { used, total, percent } => json!({"used":used,"total":total,"percent":percent}),
+        Value::Info { text, fields } => {
+            let mut m = serde_json::Map::new();
+            m.insert("text".into(), json!(text));
+            for (k,val) in fields { m.insert(k.clone(), json!(val)); }
+            J::Object(m)
+        }
         Value::None => json!("?"),
     }
 }
@@ -24,9 +31,36 @@ pub fn value_from_json(v: &J) -> Value {
         let used = o.get("used").and_then(|x| x.as_f64());
         let total = o.get("total").and_then(|x| x.as_f64());
         let percent = o.get("percent").and_then(|x| x.as_i64());
+        if let (Some(u),Some(t),Some(p)) = (used,total,percent) {
+            if o.len()==3 { return Value::Size{used:u,total:t,percent:p}; }
+        }
+        if let Some(text) = o.get("text").and_then(|x| x.as_str()) {
+            let mut fields = std::collections::BTreeMap::new();
+            for (k,val) in o { if k=="text" || k=="used"||k=="total"||k=="percent" { continue; } if let Some(s)=val.as_str(){ fields.insert(k.clone(), s.to_string()); } else { fields.insert(k.clone(), val.to_string()); } }
+            if let (Some(u),Some(t),Some(p)) = (used,total,percent) { fields.insert("used".into(), u.to_string()); fields.insert("total".into(), t.to_string()); fields.insert("percent".into(), p.to_string()); }
+            return Value::Info { text: text.to_string(), fields };
+        }
         if let (Some(u),Some(t),Some(p)) = (used,total,percent) { return Value::Size{used:u,total:t,percent:p}; }
     }
     Value::Text(v.to_string())
+}
+
+pub fn value_text(v: &Value) -> String {
+    match v {
+        Value::Text(s) => s.clone(),
+        Value::Size{used,total,percent} => format!("{used}/{total} GiB ({percent}%)"),
+        Value::Info{text,..} => text.clone(),
+        Value::None => "?".into(),
+    }
+}
+
+pub fn value_field<'a>(v: &'a Value, key: &str) -> Option<String> {
+    match v {
+        Value::Text(s) => if key=="text"||key=="value" { Some(s.clone()) } else { None },
+        Value::Size{used,total,percent} => match key { "used"=>Some(used.to_string()),"total"=>Some(total.to_string()),"percent"=>Some(percent.to_string()),"text"|"value"=>Some(format!("{used}/{total} GiB ({percent}%)")), _=>None },
+        Value::Info{text,fields} => if key=="text"||key=="value" { Some(text.clone()) } else { fields.get(key).cloned() },
+        Value::None => if key=="text"||key=="value" { Some("?".into()) } else { None },
+    }
 }
 
 trait StrExt { fn if_empty(self, d:String)->String; }
@@ -41,48 +75,63 @@ fn cmd(prog: &str, args: &[&str]) -> String {
 fn has_cmd(name:&str)->bool { Command::new("sh").args(["-c",&format!("command -v {name} >/dev/null 2>&1")]).status().map(|s|s.success()).unwrap_or(false) }
 
 pub fn get(field: &str) -> Value {
-    let s = match field {
-        "user" => std::env::var("USER").or_else(|_| std::env::var("USERNAME")).unwrap_or_else(|_| "?".into()),
-        "host" => hostname(),
-        "os" => os_name(),
-        "kernel" => kernel(),
-        "arch" => std::env::consts::ARCH.to_string(),
-        "uptime" => uptime(),
-        "boot_time" => boot_time(),
-        "loadavg" => loadavg(),
-        "cpu" => cpu(),
-        "cpu_cores" => std::thread::available_parallelism().map(|n| n.get().to_string()).unwrap_or("?".into()),
-        "gpu" => gpu(),
-        "ram" => return ram(),
-        "swap" => return swap(),
-        "disk" => return disk_root(),
-        "disks" => disks(),
-        "network" => network(),
-        "local_ip" => local_ip(),
-        "public_ip" => public_ip(),
-        "battery" => battery(),
-        "temperature" => temperature(),
-        "resolution" => resolution(),
-        "shell" => shell(),
-        "terminal" => terminal(),
-        "de" => de(),
-        "wm" => wm(),
-        "packages" => packages(),
-        "processes" => processes(),
-        "init" => init(),
-        "locale" => locale(),
-        "timezone" => timezone(),
-        "date" => date_now(),
-        "motherboard" => motherboard(),
-        "bios" => bios(),
-        "display" => resolution(),
-        "audio" => audio(),
-        "bluetooth" => bluetooth(),
-        "power" => power(),
-        _ if field.starts_with("command:") => command_field(field),
-        _ => "?".into(),
+    if field.starts_with("command:") { return Value::Text(command_field(field)); }
+    let v = match field {
+        "title" => { let u=std::env::var("USER").or_else(|_| std::env::var("USERNAME")).unwrap_or("?".into()); let h=hostname(); info_simple("title", format!("{u}@{h}")) },
+        "break"|"separator" => info_simple("text", String::new()),
+        "custom" => Value::Text(String::new()),
+        "user" => info_simple("name", std::env::var("USER").or_else(|_| std::env::var("USERNAME")).unwrap_or_else(|_| "?".into())),
+        "host" => info_simple("name", hostname()),
+        "os" => info_os(),
+        "kernel" => info_simple("release", kernel()),
+        "arch" => info_simple("arch", std::env::consts::ARCH.to_string()),
+        "uptime" => info_simple("uptime", uptime()),
+        "boot_time" => info_simple("time", boot_time()),
+        "loadavg" => info_simple("load", loadavg()),
+        "cpu" => info_cpu(),
+        "cpu_cores" => info_simple("cores", std::thread::available_parallelism().map(|n| n.get().to_string()).unwrap_or("?".into())),
+        "gpu" => info_gpu(),
+        "ram" => ram(),
+        "swap" => swap(),
+        "disk" => disk_root(),
+        "disks" => info_simple("disks", disks()),
+        "network" => info_simple("network", network()),
+        "local_ip" => info_simple("ip", local_ip()),
+        "public_ip" => info_simple("ip", public_ip()),
+        "battery" => info_simple("battery", battery()),
+        "temperature" => info_simple("temp", temperature()),
+        "resolution" => info_simple("resolution", resolution()),
+        "shell" => info_shell(),
+        "terminal" => info_terminal(),
+        "de" => info_simple("de", de()),
+        "wm" => info_simple("wm", wm()),
+        "packages" => info_packages(),
+        "processes" => info_simple("count", processes()),
+        "init" => info_simple("name", init()),
+        "locale" => info_simple("locale", locale()),
+        "timezone" => info_simple("tz", timezone()),
+        "date" => info_simple("date", date_now()),
+        "motherboard" => info_simple("name", motherboard()),
+        "bios" => info_simple("version", bios()),
+        "display" => info_simple("resolution", resolution()),
+        "audio" => info_simple("device", audio()),
+        "bluetooth" => info_simple("state", bluetooth()),
+        "power" => info_simple("state", power()),
+        _ => Value::Text("?".into()),
     };
-    Value::Text(if s.trim().is_empty() { "?".into() } else { s })
+    match &v {
+        Value::Text(s) if s.trim().is_empty() && field!="break" && field!="separator" && field!="custom" => Value::Text("?".into()),
+        Value::Info{text,..} if text.trim().is_empty() && field!="break" && field!="separator" && field!="custom" => Value::Text("?".into()),
+        _ => v,
+    }
+}
+
+fn info_simple(key:&str, val:String) -> Value {
+    let mut f = std::collections::BTreeMap::new();
+    let t = if val.trim().is_empty() { "?".into() } else { val.trim().to_string() };
+    f.insert(key.into(), t.clone());
+    f.insert("text".into(), t.clone());
+    Value::Info { text: t, fields: f }
 }
 
 fn hostname() -> String {
@@ -91,24 +140,30 @@ fn hostname() -> String {
     std::env::var("COMPUTERNAME").unwrap_or("?".into())
 }
 
-fn os_name() -> String {
+fn os_name() -> String { info_os_text() }
+fn info_os_text() -> String {
+    if cfg!(target_os="linux") {
+        if let Ok(s)=fs::read_to_string("/etc/os-release") { for line in s.lines() { if let Some(v)=line.strip_prefix("PRETTY_NAME=") { return v.trim_matches('"').to_string(); } } }
+    }
+    if cfg!(target_os="macos") { let name=cmd("sw_vers",&["-productName"]); let ver=cmd("sw_vers",&["-productVersion"]); if !name.is_empty(){ return if ver.is_empty(){name} else {format!("{name} {ver}")}; } return "macOS".into(); }
+    if cfg!(target_os="windows") { let name=cmd("powershell",&["-NoProfile","-Command","(Get-CimInstance Win32_OperatingSystem).Caption"]); if !name.is_empty(){ return name.lines().next().unwrap_or("Windows").to_string(); } return format!("Windows {}", std::env::consts::ARCH); }
+    if cfg!(target_os="freebsd") { let v=cmd("freebsd-version",&[]); return if v.is_empty(){"FreeBSD".into()} else {format!("FreeBSD {v}")}; }
+    std::env::consts::OS.to_string()
+}
+fn info_os() -> Value {
+    let mut f=std::collections::BTreeMap::new();
+    let text=info_os_text();
+    f.insert("name".into(), text.clone()); f.insert("id".into(), detect_distro_id()); f.insert("arch".into(), std::env::consts::ARCH.to_string());
     if cfg!(target_os="linux") {
         if let Ok(s)=fs::read_to_string("/etc/os-release") {
-            for line in s.lines() { if let Some(v)=line.strip_prefix("PRETTY_NAME=") { return v.trim_matches('"').to_string(); } }
+            for line in s.lines() {
+                if let Some(v)=line.strip_prefix("VERSION_ID=") { f.insert("version".into(), v.trim_matches('"').to_string()); }
+                if let Some(v)=line.strip_prefix("ID_LIKE=") { f.insert("like".into(), v.trim_matches('"').to_string()); }
+            }
         }
     }
-    if cfg!(target_os="macos") {
-        let name = cmd("sw_vers", &["-productName"]); let ver = cmd("sw_vers", &["-productVersion"]);
-        if !name.is_empty() { return if ver.is_empty(){name} else {format!("{name} {ver}")}; }
-        return "macOS".into();
-    }
-    if cfg!(target_os="windows") {
-        let name = cmd("powershell", &["-NoProfile","-Command","(Get-CimInstance Win32_OperatingSystem).Caption"]);
-        if !name.is_empty() { return name.lines().next().unwrap_or("Windows").to_string(); }
-        return format!("Windows {}", std::env::consts::ARCH);
-    }
-    if cfg!(target_os="freebsd") { let v=cmd("freebsd-version", &[]); return if v.is_empty(){"FreeBSD".into()} else {format!("FreeBSD {v}")}; }
-    format!("{}", std::env::consts::OS)
+    if cfg!(target_os="macos") { f.insert("version".into(), cmd("sw_vers",&["-productVersion"])); }
+    Value::Info { text, fields:f }
 }
 
 pub fn detect_distro_id() -> String {
@@ -194,38 +249,44 @@ fn loadavg() -> String {
     "?".into()
 }
 
-fn cpu() -> String {
+fn cpu() -> String { match info_cpu() { Value::Info{text,..}=>text, Value::Text(s)=>s, _=>"?".into() } }
+fn info_cpu() -> Value {
+    let mut f=std::collections::BTreeMap::new();
+    let mut name = String::new();
     if cfg!(target_os="linux") {
         let s = read("/proc/cpuinfo");
-        for line in s.lines() { if line.to_lowercase().starts_with("model name") { if let Some((_,v))=line.split_once(':') { return v.trim().to_string(); } } }
+        for line in s.lines() { if line.to_lowercase().starts_with("model name") { if let Some((_,v))=line.split_once(':') { name=v.trim().to_string(); break; } } }
+        if let Some(line)=s.lines().find(|l| l.to_lowercase().starts_with("cpu(s)") || l.to_lowercase().starts_with("cpu cores")) { }
+        let cores = std::thread::available_parallelism().map(|n| n.get().to_string()).unwrap_or("?".into());
+        f.insert("cores".into(), cores);
     }
-    if cfg!(target_os="macos") { let o=cmd("sysctl", &["-n","machdep.cpu.brand_string"]); if !o.is_empty() { return o; } }
-    if cfg!(target_os="windows") { let o=cmd("powershell",&["-NoProfile","-Command","(Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty Name)"]); if !o.is_empty() { return o; } }
-    std::env::consts::ARCH.to_string()
+    if cfg!(target_os="macos") { name = cmd("sysctl", &["-n","machdep.cpu.brand_string"]); f.insert("cores".into(), cmd("sysctl", &["-n","hw.logicalcpu"])); }
+    if cfg!(target_os="windows") { name = cmd("powershell",&["-NoProfile","-Command","(Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty Name)"]); f.insert("cores".into(), cmd("powershell",&["-NoProfile","-Command","(Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors"])); }
+    if name.is_empty() { name = std::env::consts::ARCH.to_string(); }
+    f.insert("name".into(), name.clone());
+    Value::Info { text:name, fields:f }
 }
 
-fn gpu() -> String {
+fn gpu() -> String { match info_gpu() { Value::Info{text,..}=>text, Value::Text(s)=>s, _=>"?".into() } }
+fn info_gpu() -> Value {
+    let mut names: Vec<String> = vec![];
     if cfg!(target_os="linux") {
         if let Ok(entries) = fs::read_dir("/sys/class/drm") {
-            let mut names = vec![];
             for e in entries.flatten() {
-                let name = e.file_name().to_string_lossy().to_string();
-                if !name.starts_with("card") || name.contains('-') { continue; }
-                let dev = e.path().join("device");
-                let vendor = read(dev.join("vendor")).trim().to_string();
-                let device = read(dev.join("device")).trim().to_string();
-                if vendor.is_empty() || device.is_empty() { continue; }
-                let label = pci_lookup(&vendor, &device).unwrap_or_else(|| format!("{vendor}:{device}"));
-                if !names.contains(&label) { names.push(label); }
+                let name=e.file_name().to_string_lossy().to_string(); if !name.starts_with("card")||name.contains('-'){continue;}
+                let dev=e.path().join("device"); let vendor=read(dev.join("vendor")).trim().to_string(); let device=read(dev.join("device")).trim().to_string();
+                if vendor.is_empty()||device.is_empty(){continue;}
+                let label=pci_lookup(&vendor,&device).unwrap_or_else(|| format!("{vendor}:{device}"));
+                if !names.contains(&label){names.push(label);}
             }
-            if !names.is_empty() { return names.join(", "); }
         }
-        let out = cmd("sh", &["-c", "lspci 2>/dev/null | grep -Ei 'vga|3d|display' | head -n1 | sed 's/.*: //' "]);
-        if !out.is_empty() { return out.lines().next().unwrap_or("?").to_string(); }
+        if names.is_empty() { let out=cmd("sh",&["-c","lspci 2>/dev/null | grep -Ei 'vga|3d|display' | head -n1 | sed 's/.*: //' "]); if !out.is_empty(){ names.push(out.lines().next().unwrap_or("?").to_string()); } }
     }
-    if cfg!(target_os="macos") { let o=cmd("sh",&["-c","system_profiler SPDisplaysDataType 2>/dev/null | awk -F': ' '/Chipset Model/{print $2; exit}'"]); if !o.is_empty() { return o; } }
-    if cfg!(target_os="windows") { let o=cmd("powershell",&["-NoProfile","-Command","(Get-CimInstance Win32_VideoController | Select-Object -First 1 -ExpandProperty Name)"]); if !o.is_empty() { return o; } }
-    "?".into()
+    if cfg!(target_os="macos") { let o=cmd("sh",&["-c","system_profiler SPDisplaysDataType 2>/dev/null | awk -F': ' '/Chipset Model/{print $2; exit}'"]); if !o.is_empty(){ names.push(o); } }
+    if cfg!(target_os="windows") { let o=cmd("powershell",&["-NoProfile","-Command","(Get-CimInstance Win32_VideoController | Select-Object -First 1 -ExpandProperty Name)"]); if !o.is_empty(){ names.push(o); } }
+    let text = if names.is_empty(){"?".into()} else {names.join(", ")};
+    let mut f=std::collections::BTreeMap::new(); f.insert("name".into(), text.clone()); f.insert("count".into(), names.len().to_string());
+    Value::Info{ text, fields:f }
 }
 fn pci_lookup(vendor: &str, device: &str) -> Option<String> {
     let v = vendor.trim_start_matches("0x").to_lowercase();
@@ -395,8 +456,20 @@ fn resolution() -> String {
     if cfg!(target_os="windows") { let o=cmd("powershell",&["-NoProfile","-Command","$v=Get-CimInstance Win32_VideoController | Select-Object -First 1; \"$($v.CurrentHorizontalResolution)x$($v.CurrentVerticalResolution)\""]); if !o.is_empty() && o!="x" { return o; } }
     "?".into()
 }
-fn shell() -> String { std::env::var("SHELL").or_else(|_| std::env::var("COMSPEC")).ok().and_then(|s| Path::new(&s).file_name().map(|n| n.to_string_lossy().to_string())).unwrap_or("?".into()) }
-fn terminal() -> String { std::env::var("TERM_PROGRAM").or_else(|_| std::env::var("TERMINAL_EMULATOR")).or_else(|_| std::env::var("WT_SESSION")).or_else(|_| std::env::var("TERM")).unwrap_or("?".into()) }
+fn shell() -> String { match info_shell() { Value::Info{text,..}=>text, Value::Text(s)=>s, _=>"?".into() } }
+fn info_shell() -> Value {
+    let path = std::env::var("SHELL").or_else(|_| std::env::var("COMSPEC")).unwrap_or("?".into());
+    let name = Path::new(&path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.clone());
+    let mut f=std::collections::BTreeMap::new(); f.insert("name".into(), name.clone()); f.insert("path".into(), path);
+    Value::Info{ text:name, fields:f }
+}
+fn terminal() -> String { match info_terminal() { Value::Info{text,..}=>text, Value::Text(s)=>s, _=>"?".into() } }
+fn info_terminal() -> Value {
+    let name = std::env::var("TERM_PROGRAM").or_else(|_| std::env::var("TERMINAL_EMULATOR")).or_else(|_| std::env::var("WT_SESSION")).or_else(|_| std::env::var("TERM")).unwrap_or("?".into());
+    let mut f=std::collections::BTreeMap::new(); f.insert("name".into(), name.clone());
+    if let Ok(v)=std::env::var("TERM_PROGRAM_VERSION") { f.insert("version".into(), v); }
+    Value::Info{ text:name, fields:f }
+}
 fn de() -> String { if cfg!(target_os="macos") { return "Aqua".into(); } if cfg!(target_os="windows") { return "Windows Shell".into(); } std::env::var("XDG_CURRENT_DESKTOP").or_else(|_| std::env::var("DESKTOP_SESSION")).unwrap_or("?".into()) }
 fn wm() -> String {
     if cfg!(target_os="macos") { return "Quartz Compositor".into(); }
@@ -404,17 +477,26 @@ fn wm() -> String {
     if std::env::var("WAYLAND_DISPLAY").ok().filter(|s| !s.is_empty()).is_some() { return std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_else(|_| "Wayland".into()); }
     std::env::var("XDG_SESSION_DESKTOP").or_else(|_| std::env::var("XDG_CURRENT_DESKTOP")).unwrap_or_else(|_| std::env::var("XDG_SESSION_TYPE").unwrap_or("?".into()))
 }
-fn packages() -> String {
+fn packages() -> String { match info_packages() { Value::Info{text,..}=>text, Value::Text(s)=>s, _=>"?".into() } }
+fn info_packages() -> Value {
+    let mut managers: Vec<(String,i64)> = vec![];
     if cfg!(target_os="linux") {
-        if let Ok(rd)=fs::read_dir("/var/lib/pacman/local") { let n=rd.flatten().filter(|e| e.file_type().map(|t|t.is_dir()).unwrap_or(false)).count(); if n>1 { return format!("{} (pacman)", n.saturating_sub(1)); } }
-        if let Ok(s)=fs::read_to_string("/var/lib/dpkg/status") { let n=s.lines().filter(|l| l.starts_with("Package: ")).count(); if n>0 { return format!("{n} (dpkg)"); } }
-        let out=cmd("sh",&["-c","rpm -qa 2>/dev/null | wc -l"]); if let Ok(n)=out.trim().parse::<i64>() { if n>0 { return format!("{n} (rpm)"); } }
-        let out=cmd("sh",&["-c","xbps-query -l 2>/dev/null | wc -l"]); if let Ok(n)=out.trim().parse::<i64>() { if n>0 { return format!("{n} (xbps)"); } }
-        let out=cmd("sh",&["-c","apk info 2>/dev/null | wc -l"]); if let Ok(n)=out.trim().parse::<i64>() { if n>0 { return format!("{n} (apk)"); } }
+        if let Ok(rd)=fs::read_dir("/var/lib/pacman/local") { let n=rd.flatten().filter(|e| e.file_type().map(|t|t.is_dir()).unwrap_or(false)).count() as i64; if n>1 { managers.push(("pacman".into(), n-1)); } }
+        if let Ok(s)=fs::read_to_string("/var/lib/dpkg/status") { let n=s.lines().filter(|l| l.starts_with("Package: ")).count() as i64; if n>0 { managers.push(("dpkg".into(), n)); } }
+        for (name,cmdline) in [("rpm","rpm -qa 2>/dev/null | wc -l"),("xbps","xbps-query -l 2>/dev/null | wc -l"),("apk","apk info 2>/dev/null | wc -l"),("flatpak","flatpak list 2>/dev/null | wc -l"),("snap","snap list 2>/dev/null | tail -n +2 | wc -l")] {
+            let out=cmd("sh",&["-c",cmdline]); if let Ok(n)=out.trim().parse::<i64>() { if n>0 { managers.push((name.into(), n)); } }
+        }
     }
-    if cfg!(target_os="macos") { let b=cmd("sh",&["-c","brew list --formula 2>/dev/null | wc -l"]); if let Ok(n)=b.trim().parse::<i64>() { if n>0 { return format!("{n} (brew)"); } } }
-    if cfg!(target_os="windows") { let c=cmd("powershell",&["-NoProfile","-Command","(choco list --local-only -r 2>$null | Measure-Object).Count"]); if let Ok(n)=c.trim().parse::<i64>() { if n>0 { return format!("{n} (choco)"); } } let s=cmd("powershell",&["-NoProfile","-Command","(scoop list 2>$null | Measure-Object).Count"]); if let Ok(n)=s.trim().parse::<i64>() { if n>2 { return format!("{} (scoop)", n-2); } } }
-    "?".into()
+    if cfg!(target_os="macos") { let b=cmd("sh",&["-c","brew list --formula 2>/dev/null | wc -l"]); if let Ok(n)=b.trim().parse::<i64>() { if n>0 { managers.push(("brew".into(), n)); } } }
+    if cfg!(target_os="windows") {
+        let c=cmd("powershell",&["-NoProfile","-Command","(choco list --local-only -r 2>$null | Measure-Object).Count"]); if let Ok(n)=c.trim().parse::<i64>() { if n>0 { managers.push(("choco".into(), n)); } }
+        let s=cmd("powershell",&["-NoProfile","-Command","(scoop list 2>$null | Measure-Object).Count"]); if let Ok(n)=s.trim().parse::<i64>() { if n>2 { managers.push(("scoop".into(), n-2)); } }
+        let w=cmd("powershell",&["-NoProfile","-Command","(winget list 2>$null | Measure-Object).Count"]); if let Ok(n)=w.trim().parse::<i64>() { if n>0 { managers.push(("winget".into(), n)); } }
+    }
+    let text = if managers.is_empty() { "?".into() } else { managers.iter().map(|(n,c)| format!("{c} ({n})")).collect::<Vec<_>>().join(", ") };
+    let mut f=std::collections::BTreeMap::new(); f.insert("text".into(), text.clone()); f.insert("count".into(), managers.iter().map(|(_,c)|*c).sum::<i64>().to_string());
+    f.insert("managers".into(), managers.iter().map(|(n,_)|n.clone()).collect::<Vec<_>>().join(","));
+    Value::Info{ text, fields:f }
 }
 fn processes() -> String {
     if cfg!(target_os="linux") { if let Ok(rd)=fs::read_dir("/proc") { let n=rd.flatten().filter(|e| e.file_name().to_string_lossy().chars().all(|c| c.is_ascii_digit())).count(); return n.to_string(); } }

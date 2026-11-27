@@ -87,26 +87,36 @@ pub fn format_value(v: &Value, opts_bar_width: usize, bar_style: &str, ascii: bo
             format!("{used}/{total} GiB   {b}  {percent}%")
         }
         Value::Text(s) => s.clone(),
+        Value::Info{text, ..} => text.clone(),
         Value::None => "?".into(),
     }
 }
 
-pub fn render_info_lines(fields: &[String], data: &std::collections::BTreeMap<String,Value>, use_color: bool, accent: Option<(u8,u8,u8)>, sep: &str, bar_width: usize, bar_style: &str, ascii: bool, compact: bool) -> Vec<String> {
+pub fn render_info_lines_spec(specs: &[crate::ModuleSpec], data: &std::collections::BTreeMap<String,Value>, opts: &crate::Opts, accent: Option<(u8,u8,u8)>) -> Vec<String> {
     let mut max_label = 0usize;
-    for f in fields { max_label = max_label.max(crate::label(f).len()); }
+    for s in specs { if s.is_builtin() { max_label = max_label.max(s.display_key().len()); } }
     let mut out = vec![];
     let ac = accent.map(|(r,g,b)| ansi_rgb(r,g,b));
-    for f in fields {
-        let v = data.get(f).cloned().unwrap_or(Value::Text("?".into()));
-        let val = format_value(&v, bar_width, bar_style, ascii);
-        let lbl = crate::label(f);
-        let line = if use_color {
-            let ac = ac.as_deref().unwrap_or(BOLD);
-            if compact { format!("{ac}{BOLD}{lbl}{RESET}{sep}{val}") }
-            else { format!("{ac}{BOLD}{:>w$}{RESET}{sep}{val}", lbl, w=max_label) }
+    for s in specs {
+        if s.kind == "break" { out.push(String::new()); continue; }
+        if s.kind == "separator" { out.push(if opts.ascii { "-".repeat(max_label.max(8)) } else { "─".repeat(max_label.max(8)) }); continue; }
+        if s.kind == "title" || s.kind == "custom" {
+            let v = data.get(&s.kind).cloned().unwrap_or(Value::Text(String::new()));
+            let txt = if let Some(t)=&s.format { crate::format_with_template(t, &s.kind, &v) } else { crate::modules::value_text(&v) };
+            out.push(txt);
+            continue;
+        }
+        let v = data.get(&s.kind).cloned().unwrap_or(Value::Text("?".into()));
+        let val = if let Some(t)=&s.format { crate::format_with_template(t, &s.kind, &v) } else { format_value(&v, opts.bar_width, &opts.bar_style, opts.ascii) };
+        let lbl = s.display_key();
+        let key_ac = s.key_color.as_deref().and_then(|c| parse_hex_color(c).or_else(|| named_color(c))).map(|(r,g,b)| ansi_rgb(r,g,b)).or_else(|| ac.clone());
+        let line = if opts.color {
+            let ac = key_ac.as_deref().unwrap_or(BOLD);
+            if opts.compact { format!("{ac}{BOLD}{lbl}{RESET}{}{val}", opts.separator) }
+            else { format!("{ac}{BOLD}{:>w$}{RESET}{}{val}", lbl, opts.separator, w=max_label) }
         } else {
-            if compact { format!("{lbl}{sep}{val}") }
-            else { format!("{:>w$}{sep}{val}", lbl, w=max_label) }
+            if opts.compact { format!("{lbl}{}{val}", opts.separator) }
+            else { format!("{:>w$}{}{val}", lbl, opts.separator, w=max_label) }
         };
         out.push(line);
     }

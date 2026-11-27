@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>nullfetch</id>
+    <version>3.1.0</version>
+    <title>nullfetch</title>
+    <authors>pybindi</authors>
+    <projectUrl>https://github.com/pybindi/nullfetch</projectUrl>
+    <licenseUrl>https://github.com/pybindi/nullfetch/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Fast system fetch tool written in Rust.</description>
+    <tags>fetch neofetch fastfetch rust cli</tags>
+  </metadata>
+</package>

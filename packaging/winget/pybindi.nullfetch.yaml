@@ -1,0 +1,15 @@
+# winget manifest template - split into version/default/installer files for submission
+PackageIdentifier: pybindi.nullfetch
+PackageVersion: 3.1.0
+PackageLocale: en-US
+Publisher: pybindi
+PackageName: nullfetch
+License: MIT
+ShortDescription: Fast system fetch tool written in Rust
+Installers:
+  - Architecture: x64
+    InstallerType: zip
+    InstallerUrl: https://github.com/pybindi/nullfetch/releases/download/v3.1.0/nullfetch-v3.1.0-x86_64-pc-windows-msvc.zip
+    InstallerSha256: REPLACE_WITH_SHA256
+ManifestType: singleton
+ManifestVersion: 1.6.0

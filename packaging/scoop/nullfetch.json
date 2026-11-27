@@ -1,0 +1,21 @@
+{
+  "version": "3.1.0",
+  "description": "Fast system fetch tool written in Rust",
+  "homepage": "https://github.com/pybindi/nullfetch",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/pybindi/nullfetch/releases/download/v3.1.0/nullfetch-v3.1.0-x86_64-pc-windows-msvc.zip",
+      "hash": "REPLACE_WITH_SHA256"
+    }
+  },
+  "bin": "nullfetch.exe",
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/pybindi/nullfetch/releases/download/v$version/nullfetch-v$version-x86_64-pc-windows-msvc.zip"
+      }
+    }
+  }
+}

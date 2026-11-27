@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "nullfetch config",
+  "type": "object",
+  "properties": {
+    "$schema": {"type":"string"},
+    "logo": {
+      "oneOf": [
+        {"type":"string"},
+        {"type":"object","properties":{"type":{"type":"string"},"source":{"type":"string"},"color1":{"type":"string"},"color2":{"type":"string"}},"additionalProperties":true}
+      ]
+    },
+    "theme": {"type":"string"},
+    "color": {"type":"string","enum":["auto","always","never"]},
+    "accent": {"type":"string"},
+    "separator": {"type":"string"},
+    "compact": {"type":"boolean"},
+    "ascii": {"type":"boolean"},
+    "bar": {"type":"object","properties":{"style":{"type":"string"},"width":{"type":"integer","minimum":1}},"additionalProperties":true},
+    "image": {
+      "oneOf":[
+        {"type":"string"},
+        {"type":"object","properties":{"source":{"type":"string"},"mode":{"type":"string"},"width":{"type":"integer"},"height":{"type":"integer"},"position":{"type":"string"},"bg":{"type":"string"}},"additionalProperties":true}
+      ]
+    },
+    "modules": {
+      "type":"array",
+      "items": {
+        "oneOf": [
+          {"type":"string"},
+          {"type":"object","properties":{"type":{"type":"string"},"key":{"type":"string"},"format":{"type":"string"},"keyColor":{"type":"string"}},"required":["type"],"additionalProperties":true}
+        ]
+      }
+    }
+  },
+  "additionalProperties": true
+}
