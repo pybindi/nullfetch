@@ -5,7 +5,7 @@
 # nullfetch
 
 **A fast, tiny, no-nonsense system fetch for Linux.**  
-Pure Python. Zero required dependencies. Terminal images. 28 modules. Your config.
+Pure Python. Zero required dependencies. Terminal images. 31 modules. Presets. Command modules. Your config.
 
 <p>
   <a href="https://github.com/pybindi/nullfetch/releases"><img src="https://img.shields.io/github/v/release/pybindi/nullfetch?style=for-the-badge&color=478061&label=release" alt="Release"></a>
@@ -47,9 +47,10 @@ Pure Python. Zero required dependencies. Terminal images. 28 modules. Your confi
 <td width="50%" valign="top">
 
 ### System info
-- 28 modules, from classic fetch fields to uptime, DE/WM, packages, temperature, network, locale, and more.
+- 31 modules, from classic fetch fields to loadavg, boot/init, DE/WM, packages, temperature, network, locale, and more.
 - `--all` for everything, `--only` for a precise set.
-- Parallel collection and short-TTL cache for slow modules.
+- Custom command modules: `command:name:cmd`.
+- Parallel collection, short-TTL cache, and `--timing` with slowest modules.
 
 </td>
 <td width="50%" valign="top">
@@ -142,7 +143,10 @@ sha256sum -c SHA256SUMS
 ```bash
 nullfetch                          # classic logo + default modules
 nullfetch --all                    # every module
+nullfetch --preset dev             # ready-made layout for dev machines
 nullfetch --only cpu,ram,temperature
+nullfetch --only user,command:git:git\ branch\ --show-current
+nullfetch --doctor                 # check terminal/image/capabilities
 nullfetch --theme dracula --bar-style dots
 nullfetch --image ~/wallpaper.png  --image-mode blocks
 ```
@@ -176,13 +180,16 @@ nullfetch --image logo.png --image-mode kitty
 
 **Default:** `user host os kernel cpu gpu ram disk`
 
-**Extra:** `arch uptime cpu_cores swap disks network local_ip public_ip battery temperature resolution shell terminal de wm packages processes locale timezone date`
+**Extra:** `arch uptime boot_time loadavg cpu_cores swap disks network local_ip public_ip battery temperature resolution shell terminal de wm packages processes init locale timezone date`
+
+**Custom:** `command:<name>:<cmd>` (use in `--only` or config `modules`)
 
 ```bash
 nullfetch --list-fields
 nullfetch --all
 nullfetch --all --no-network
 nullfetch --only uptime,shell,de,wm,packages
+nullfetch --only os,command:git:git\ branch\ --show-current
 ```
 
 > [!NOTE]
@@ -194,6 +201,7 @@ Save your look once, keep it forever:
 
 ```bash
 nullfetch --logo cat --accent orange --theme neon --save-config
+nullfetch --preset dev --save-config
 nullfetch --show-config
 nullfetch --reset-config
 ```
@@ -213,10 +221,11 @@ nullfetch --set image=$HOME/avatar.png
 - Path: `~/.config/nullfetch/config.json` (or `$XDG_CONFIG_HOME/nullfetch/config.json`)
 - Alternate file: `--config FILE`
 - CLI options override config values.
-- Keys: `logo`, `logo-file`, `accent`, `theme`, `color`, `image`, `image-mode`, `image-width`, `image-height`, `image-position`, `image-bg`, `modules`, `separator`, `bar-style`, `bar-width`, `format`, `cache-ttl`, `ascii`, `compact`, `all`, `no-cache`, `no-network`, `timing`.
+- Keys: `logo`, `logo-file`, `accent`, `theme`, `color`, `preset`, `image`, `image-mode`, `image-width`, `image-height`, `image-position`, `image-bg`, `modules`, `separator`, `bar-style`, `bar-width`, `format`, `cache-ttl`, `ascii`, `compact`, `all`, `no-cache`, `no-network`, `timing`.
 
 **Themes:** `default mono light neon dark nord gruvbox dracula tokyo solarized matrix`  
-**Colors:** named colors, distro names, `#rrggbb`, `#rgb`
+**Colors:** named colors, distro names, `#rrggbb`, `#rgb`  
+**Presets:** `minimal`, `full`, `dev`, `server`
 
 </details>
 
@@ -252,12 +261,15 @@ nullfetch --oneline
 | `-h`, `--help` | Show help |
 | `--version` | Show version |
 | `--all` | Show every module |
-| `-o`, `--only FIELDS` | Show selected modules |
+| `--preset NAME` | Built-in preset: `minimal`, `full`, `dev`, `server` |
+| `--doctor` | Diagnostics for terminal/image/cache |
+| `-o`, `--only FIELDS` | Show selected modules / `command:name:cmd` |
 | `--list-fields` | List module names |
+| `--list-presets` | List presets |
 | `--json` | JSON output |
 | `--format FORMAT` | `text`, `json`, `csv`, `markdown`, `oneline` |
 | `--oneline` | Compact one-line output |
-| `--timing` | Print collection time to stderr |
+| `--timing` | Print collection time and slowest modules |
 
 </details>
 
@@ -319,6 +331,7 @@ nullfetch --logo-file ~/art.txt
 ```bash
 time nullfetch >/dev/null
 nullfetch --timing
+nullfetch --doctor
 nullfetch --only os,kernel,cpu,ram --no-logo
 ```
 

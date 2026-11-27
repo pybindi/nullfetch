@@ -59,15 +59,20 @@ def test_list_fields_and_modes():
     fields = run("--list-fields").stdout.split()
     assert "uptime" in fields
     assert "public_ip" in fields
+    assert "loadavg" in fields
+    assert "init" in fields
     modes = run("--list-image-modes").stdout.split()
     assert "blocks" in modes
     assert "kitty" in modes
+    presets = run("--list-presets").stdout
+    assert "minimal:" in presets
+    assert "dev:" in presets
 
 
 def test_csv_and_markdown_output():
     csv_text = run("--format", "csv", "--only", "user,ram").stdout
     assert csv_text.splitlines()[0] == "field,value"
-    assert "user," in csv_text
+    assert "USER," in csv_text
     markdown = run("--format", "markdown", "--only", "os").stdout
     assert markdown.startswith("| Field | Value |")
     assert "| OS |" in markdown
@@ -232,8 +237,9 @@ def test_collect_runs_getters_in_parallel(monkeypatch):
     monkeypatch.setitem(nullfetch.GETTERS, "arch", first)
     monkeypatch.setitem(nullfetch.GETTERS, "kernel", second)
     started = time.monotonic()
-    result = nullfetch.collect(["arch", "kernel"], use_cache=False)
+    result, timings = nullfetch.collect(["arch", "kernel"], use_cache=False)
     assert result == {"arch": "first", "kernel": "second"}
+    assert "arch" in timings and "kernel" in timings
     assert time.monotonic() - started < 1.0
 
 
@@ -257,3 +263,48 @@ def test_saved_format_is_reused(capsys):
     capsys.readouterr()
     assert nullfetch.main([]) == 0
     assert capsys.readouterr().out.startswith("| Field | Value |")
+
+
+def test_preset_minimal():
+    result = run("--preset", "minimal", "--no-color", "--logo", "none")
+    assert result.returncode == 0
+    assert "OS:" in result.stdout
+    assert "RAM:" in result.stdout
+    assert "USER:" not in result.stdout
+
+
+def test_doctor_output():
+    result = run("--doctor")
+    assert result.returncode == 0
+    assert "version: 2.1.0" in result.stdout
+    assert "image_module:" in result.stdout
+
+
+def test_command_module_cli(capsys):
+    assert (
+        nullfetch.main(
+            [
+                "--only",
+                "user,command:hello:printf hello",
+                "--no-color",
+                "--logo",
+                "none",
+            ]
+        )
+        == 0
+    )
+    out = capsys.readouterr().out
+    assert "USER:" in out
+    assert "hello: hello" in out
+
+
+def test_command_module_in_config(capsys):
+    path = nullfetch.config_path()
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps({"modules": ["os", "command:hi:printf hi"], "logo": "none"})
+    )
+    assert nullfetch.main(["--no-color"]) == 0
+    out = capsys.readouterr().out
+    assert "OS:" in out
+    assert "hi: hi" in out
